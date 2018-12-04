@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,7 +23,7 @@
 
 /*
  * @test
- * @bug 4673940 4930794
+ * @bug 4673940 4930794 8211842
  * @summary Unit tests for inetd feature
  * @requires (os.family == "linux" | os.family == "solaris")
  * @library /test/lib
@@ -33,8 +33,8 @@
  *        jdk.test.lib.JDKToolLauncher
  *        jdk.test.lib.Platform
  *        jdk.test.lib.process.*
- *        StateTest StateTestService EchoTest EchoService CloseTest Launcher Util
- * @run testng/othervm InheritedChannelTest
+ *        UnixSocketTest StateTest StateTestService EchoTest EchoService CloseTest Launcher Util
+ * @run testng/othervm/native InheritedChannelTest
  * @key intermittent
  */
 
@@ -57,7 +57,7 @@ import static java.util.Arrays.asList;
 public class InheritedChannelTest {
 
     private static final String TEST_SRC = System.getProperty("test.src");
-    private static final String TEST_CLASSES = System.getProperty("test.classes");
+    private static final String TEST_CLASSES = System.getProperty("test.class.path");
     private static final Path POLICY_PASS = Paths.get(TEST_SRC, "java.policy.pass");
     private static final Path POLICY_FAIL = Paths.get(TEST_SRC, "java.policy.fail");
 
@@ -68,13 +68,12 @@ public class InheritedChannelTest {
     private static final String OS_ARCH = ARCH.equals("i386") ? "i586" : ARCH;
 
     private static final Path LD_LIBRARY_PATH
-            = Paths.get(TEST_SRC, "lib", OS_NAME + "-" + OS_ARCH);
-
-    private static final Path LAUNCHERLIB = LD_LIBRARY_PATH.resolve("libLauncher.so");
+            = Paths.get(System.getProperty("java.library.path"));
 
     @DataProvider
     public Object[][] testCases() {
         return new Object[][]{
+            { "UnixSocketTest", List.of(UnixSocketTest.class.getName())},
             { "StateTest", List.of(StateTest.class.getName()) },
             { "EchoTest",  List.of(EchoTest.class.getName())  },
             { "CloseTest", List.of(CloseTest.class.getName()) },
@@ -99,11 +98,6 @@ public class InheritedChannelTest {
 
     @Test(dataProvider = "testCases")
     public void test(String desc, List<String> opts) throws Throwable {
-        if (!Files.exists(LAUNCHERLIB)) {
-            System.out.println("Cannot find " + LAUNCHERLIB
-                    + " - library not available for this system");
-            return;
-        }
         System.out.println("LD_LIBRARY_PATH=" + LD_LIBRARY_PATH);
 
         List<String> args = new ArrayList<>();

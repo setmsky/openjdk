@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.core.common.type;
 
 import jdk.vm.ci.meta.Constant;
@@ -140,10 +142,13 @@ public abstract class AbstractPointerStamp extends Stamp {
     @Override
     public Constant asConstant() {
         if (alwaysNull) {
-            return JavaConstant.NULL_POINTER;
-        } else {
-            return null;
+            return nullConstant();
         }
+        return super.asConstant();
+    }
+
+    public JavaConstant nullConstant() {
+        return JavaConstant.NULL_POINTER;
     }
 
     @Override

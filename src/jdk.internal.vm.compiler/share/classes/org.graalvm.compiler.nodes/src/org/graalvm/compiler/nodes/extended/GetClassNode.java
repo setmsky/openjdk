@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.nodes.extended;
 
 import static org.graalvm.compiler.nodeinfo.NodeCycles.CYCLES_2;
@@ -91,8 +93,8 @@ public final class GetClassNode extends FloatingNode implements Lowerable, Canon
         ValueNode alias = tool.getAlias(getObject());
         if (alias instanceof VirtualObjectNode) {
             VirtualObjectNode virtual = (VirtualObjectNode) alias;
-            Constant javaClass = tool.getConstantReflectionProvider().asJavaClass(virtual.type());
-            tool.replaceWithValue(ConstantNode.forConstant(stamp(NodeView.DEFAULT), javaClass, tool.getMetaAccessProvider(), graph()));
+            Constant javaClass = tool.getConstantReflection().asJavaClass(virtual.type());
+            tool.replaceWithValue(ConstantNode.forConstant(stamp(NodeView.DEFAULT), javaClass, tool.getMetaAccess(), graph()));
         }
     }
 }

@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.replacements.test;
 
 import java.lang.reflect.InvocationTargetException;
@@ -33,6 +35,7 @@ import org.graalvm.compiler.nodes.StructuredGraph;
 import org.graalvm.compiler.nodes.StructuredGraph.AllowAssumptions;
 import org.graalvm.compiler.nodes.java.MethodCallTargetNode;
 import org.graalvm.compiler.nodes.spi.LoweringTool;
+import org.graalvm.compiler.phases.BasePhase;
 import org.graalvm.compiler.phases.common.CanonicalizerPhase;
 import org.graalvm.compiler.phases.common.DeadCodeEliminationPhase;
 import org.graalvm.compiler.phases.common.LoweringPhase;
@@ -55,14 +58,24 @@ public abstract class MethodSubstitutionTest extends GraalCompilerTest {
         return testGraph(snippet, null);
     }
 
+    @SuppressWarnings("unused")
+    public BasePhase<HighTierContext> createInliningPhase(StructuredGraph graph) {
+        return new InliningPhase(new CanonicalizerPhase());
+    }
+
     @SuppressWarnings("try")
     protected StructuredGraph testGraph(final String snippet, String name) {
+        return testGraph(getResolvedJavaMethod(snippet), name);
+    }
+
+    @SuppressWarnings("try")
+    protected StructuredGraph testGraph(final ResolvedJavaMethod method, String name) {
         DebugContext debug = getDebugContext();
-        try (DebugContext.Scope s = debug.scope("MethodSubstitutionTest", getResolvedJavaMethod(snippet))) {
-            StructuredGraph graph = parseEager(snippet, AllowAssumptions.YES, debug);
+        try (DebugContext.Scope s = debug.scope("MethodSubstitutionTest", method)) {
+            StructuredGraph graph = parseEager(method, AllowAssumptions.YES, debug);
             HighTierContext context = getDefaultHighTierContext();
             debug.dump(DebugContext.BASIC_LEVEL, graph, "Graph");
-            new InliningPhase(new CanonicalizerPhase()).apply(graph, context);
+            createInliningPhase(graph).apply(graph, context);
             debug.dump(DebugContext.BASIC_LEVEL, graph, "Graph");
             new CanonicalizerPhase().apply(graph, context);
             new DeadCodeEliminationPhase().apply(graph);
@@ -103,19 +116,20 @@ public abstract class MethodSubstitutionTest extends GraalCompilerTest {
         return graph;
     }
 
-    protected void testSubstitution(String testMethodName, Class<?> intrinsicClass, Class<?> holder, String methodName, Class<?>[] parameterTypes, boolean optional, Object[] args1, Object[] args2) {
+    protected void testSubstitution(String testMethodName, Class<?> intrinsicClass, Class<?> holder, String methodName, Class<?>[] parameterTypes, boolean optional, boolean forceCompilation,
+                    Object[] args1, Object[] args2) {
         ResolvedJavaMethod realMethod = getResolvedJavaMethod(holder, methodName, parameterTypes);
         ResolvedJavaMethod testMethod = getResolvedJavaMethod(testMethodName);
         StructuredGraph graph = testGraph(testMethodName);
 
         // Check to see if the resulting graph contains the expected node
-        StructuredGraph replacement = getReplacements().getSubstitution(realMethod, -1);
+        StructuredGraph replacement = getReplacements().getSubstitution(realMethod, -1, false, null);
         if (replacement == null && !optional) {
             assertInGraph(graph, intrinsicClass);
         }
 
         // Force compilation
-        InstalledCode code = getCode(testMethod);
+        InstalledCode code = getCode(testMethod, null, forceCompilation);
         assert optional || code != null;
 
         for (int i = 0; i < args1.length; i++) {

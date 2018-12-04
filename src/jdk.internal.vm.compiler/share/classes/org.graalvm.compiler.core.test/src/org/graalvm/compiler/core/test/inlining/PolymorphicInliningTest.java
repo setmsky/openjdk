@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.core.test.inlining;
 
 import static org.graalvm.compiler.test.SubprocessUtil.getVMCommandLine;
@@ -46,12 +48,19 @@ import org.graalvm.compiler.phases.common.inlining.InliningPhase;
 import org.graalvm.compiler.phases.tiers.HighTierContext;
 import org.graalvm.compiler.test.SubprocessUtil;
 import org.junit.Assert;
+import org.junit.Assume;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.util.List;
 
 public class PolymorphicInliningTest extends GraalCompilerTest {
+
+    @Before
+    public void checkJavaAgent() {
+        Assume.assumeFalse("Java Agent found -> skipping", SubprocessUtil.isJavaAgentAttached());
+    }
 
     @Test
     public void testInSubprocess() throws InterruptedException, IOException {

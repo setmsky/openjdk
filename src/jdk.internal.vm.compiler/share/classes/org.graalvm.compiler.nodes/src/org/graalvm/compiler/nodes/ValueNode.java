@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.nodes;
 
 import java.util.function.Predicate;
@@ -130,6 +132,11 @@ public abstract class ValueNode extends org.graalvm.compiler.graph.Node implemen
     public final boolean isNullConstant() {
         JavaConstant value = asJavaConstant();
         return value != null && value.isNull();
+    }
+
+    public final boolean isDefaultConstant() {
+        Constant value = asConstant();
+        return value != null && value.isDefaultForKind();
     }
 
     /**

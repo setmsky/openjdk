@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,9 +32,10 @@
 #include "interpreter/interpreter.hpp"
 #include "interpreter/linkResolver.hpp"
 #include "memory/resourceArea.hpp"
-#include "memory/universe.inline.hpp"
+#include "memory/universe.hpp"
 #include "oops/method.hpp"
 #include "oops/oop.inline.hpp"
+#include "runtime/handles.inline.hpp"
 #include "runtime/mutexLocker.hpp"
 #include "runtime/stubRoutines.hpp"
 
@@ -169,8 +170,9 @@ void InlineCacheBuffer_init() {
 
 
 void InlineCacheBuffer::create_transition_stub(CompiledIC *ic, void* cached_value, address entry) {
+  MutexLockerEx ml(CompiledIC_lock->owned_by_self() ? NULL : CompiledIC_lock);
   assert(!SafepointSynchronize::is_at_safepoint(), "should not be called during a safepoint");
-  assert (CompiledIC_lock->is_locked(), "");
+  assert(CompiledICLocker::is_safe(ic->instruction_address()), "mt unsafe call");
   if (TraceICBuffer) {
     tty->print_cr("  create transition stub for " INTPTR_FORMAT " destination " INTPTR_FORMAT " cached value " INTPTR_FORMAT,
                   p2i(ic->instruction_address()), p2i(entry), p2i(cached_value));
@@ -223,7 +225,9 @@ void InlineCacheBuffer::release_pending_icholders() {
 // not safe to free them until them since they might be visible to
 // another thread.
 void InlineCacheBuffer::queue_for_release(CompiledICHolder* icholder) {
-  MutexLockerEx mex(InlineCacheBuffer_lock);
+  MutexLockerEx mex1((CompiledIC_lock->owned_by_self() ||
+                      SafepointSynchronize::is_at_safepoint()) ? NULL : CompiledIC_lock);
+  MutexLockerEx mex2(InlineCacheBuffer_lock);
   icholder->set_next(_pending_released);
   _pending_released = icholder;
   _pending_count++;

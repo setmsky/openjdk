@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.hotspot.nodes.type;
 
 import java.util.Objects;
@@ -120,11 +122,11 @@ public final class KlassPointerStamp extends MetaspacePointerStamp {
     }
 
     @Override
-    public Constant asConstant() {
-        if (alwaysNull() && isCompressed()) {
+    public JavaConstant nullConstant() {
+        if (isCompressed()) {
             return HotSpotCompressedNullConstant.COMPRESSED_NULL;
         } else {
-            return super.asConstant();
+            return super.nullConstant();
         }
     }
 

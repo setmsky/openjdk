@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.lir.alloc.trace.lsra;
 
 import static jdk.vm.ci.code.CodeUtil.isOdd;
@@ -449,14 +451,14 @@ final class TraceLinearScanWalker {
             optimalSplitPos = allocator.getFirstLirInstructionId(maxBlock);
         }
 
-        // minimal block probability
-        double minProbability = maxBlock.probability();
+        // minimal block frequency
+        double minFrequency = maxBlock.getRelativeFrequency();
         for (int i = toBlockNr - 1; i >= fromBlockNr; i--) {
             AbstractBlockBase<?> cur = blockAt(i);
 
-            if (cur.probability() < minProbability) {
-                // Block with lower probability found. Split at the end of this block.
-                minProbability = cur.probability();
+            if (cur.getRelativeFrequency() < minFrequency) {
+                // Block with lower frequency found. Split at the end of this block.
+                minFrequency = cur.getRelativeFrequency();
                 optimalSplitPos = allocator.getLastLirInstructionId(cur) + 2;
             }
         }
@@ -854,16 +856,16 @@ final class TraceLinearScanWalker {
             optimalSplitPos = maxSplitPos;
         }
 
-        // minimal block probability
-        double minProbability = maxBlock.probability();
+        // minimal block frequency
+        double minFrequency = maxBlock.getRelativeFrequency();
         for (int i = toBlockNr - 1; i >= fromBlockNr; i--) {
             AbstractBlockBase<?> cur = blockAt(i);
 
-            if (cur.probability() < minProbability) {
-                // Block with lower probability found. Split at the end of this block.
+            if (cur.getRelativeFrequency() < minFrequency) {
+                // Block with lower frequency found. Split at the end of this block.
                 int opIdBeforeBlockEnd = allocator.getLastLirInstructionId(cur) - 2;
                 if (allocator.getLIR().getLIRforBlock(cur).size() > 2) {
-                    minProbability = cur.probability();
+                    minFrequency = cur.getRelativeFrequency();
                     optimalSplitPos = opIdBeforeBlockEnd;
                 } else {
                     /*

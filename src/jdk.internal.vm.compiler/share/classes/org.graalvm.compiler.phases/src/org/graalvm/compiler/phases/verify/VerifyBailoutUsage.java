@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.phases.verify;
 
 import org.graalvm.compiler.core.common.PermanentBailoutException;
@@ -46,7 +48,16 @@ public class VerifyBailoutUsage extends VerifyPhase<PhaseContext> {
 
     static {
         try {
-            AllowedPackagePrefixes = new String[]{getPackageName(PermanentBailoutException.class), "jdk.vm.ci"};
+            AllowedPackagePrefixes = new String[]{
+                            getPackageName(PermanentBailoutException.class),
+                            "jdk.vm.ci",
+
+                            // Allows GraalTruffleRuntime.handleAnnotationFailure to throw
+                            // a BailoutException since the org.graalvm.compiler.truffle.runtime
+                            // project can not see the PermanentBailoutException or
+                            // RetryableBailoutException types.
+                            "org.graalvm.compiler.truffle.runtime"
+            };
         } catch (Throwable t) {
             throw new GraalError(t);
         }

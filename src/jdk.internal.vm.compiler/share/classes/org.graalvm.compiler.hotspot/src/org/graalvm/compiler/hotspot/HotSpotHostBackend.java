@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.hotspot;
 
 import static jdk.vm.ci.code.CodeUtil.K;
@@ -40,6 +42,7 @@ import org.graalvm.compiler.lir.framemap.ReferenceMapBuilder;
 import org.graalvm.compiler.nodes.StructuredGraph;
 import org.graalvm.compiler.options.OptionValues;
 import org.graalvm.compiler.printer.GraalDebugHandlersFactory;
+import org.graalvm.compiler.word.Word;
 
 import jdk.vm.ci.code.CallingConvention;
 import jdk.vm.ci.common.InitTimer;
@@ -63,6 +66,10 @@ public abstract class HotSpotHostBackend extends HotSpotBackend {
      * Descriptor for {@code SharedRuntime::deopt_blob()->uncommon_trap()}.
      */
     public static final ForeignCallDescriptor UNCOMMON_TRAP_HANDLER = new ForeignCallDescriptor("uncommonTrapHandler", void.class);
+
+    public static final ForeignCallDescriptor ENABLE_STACK_RESERVED_ZONE = new ForeignCallDescriptor("enableStackReservedZoneEntry", void.class, Word.class);
+
+    public static final ForeignCallDescriptor THROW_DELAYED_STACKOVERFLOW_ERROR = new ForeignCallDescriptor("throwDelayedStackoverflowError", void.class);
 
     protected final GraalHotSpotVMConfig config;
 

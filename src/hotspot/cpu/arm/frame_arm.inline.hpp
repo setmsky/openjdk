@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -83,7 +83,6 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   }
 }
 
-#ifndef AARCH64
 
 inline frame::frame(intptr_t* sp, intptr_t* fp) {
   _sp = sp;
@@ -104,7 +103,6 @@ inline frame::frame(intptr_t* sp, intptr_t* fp) {
   }
 }
 
-#endif // !AARCH64
 
 // Accessors
 
@@ -148,11 +146,9 @@ inline intptr_t** frame::interpreter_frame_locals_addr() const {
   return (intptr_t**)addr_at(interpreter_frame_locals_offset);
 }
 
-#ifndef AARCH64
 inline intptr_t* frame::interpreter_frame_last_sp() const {
   return *(intptr_t**)addr_at(interpreter_frame_last_sp_offset);
 }
-#endif // !AARCH64
 
 inline intptr_t* frame::interpreter_frame_bcp_addr() const {
   return (intptr_t*)addr_at(interpreter_frame_bcp_offset);
@@ -181,12 +177,6 @@ inline oop* frame::interpreter_frame_mirror_addr() const {
 
 // top of expression stack
 inline intptr_t* frame::interpreter_frame_tos_address() const {
-#ifdef AARCH64
-  intptr_t* stack_top = (intptr_t*)*addr_at(interpreter_frame_stack_top_offset);
-  assert(stack_top != NULL, "should be stored before call");
-  assert(stack_top <= (intptr_t*) interpreter_frame_monitor_end(), "bad tos");
-  return stack_top;
-#else
   intptr_t* last_sp = interpreter_frame_last_sp();
   if (last_sp == NULL ) {
     return sp();
@@ -197,7 +187,6 @@ inline intptr_t* frame::interpreter_frame_tos_address() const {
     assert(last_sp <= (intptr_t*) interpreter_frame_monitor_end(), "bad tos");
     return last_sp;
   }
-#endif // AARCH64
 }
 
 inline oop* frame::interpreter_frame_temp_oop_addr() const {
@@ -218,9 +207,6 @@ inline intptr_t* frame::interpreter_frame_expression_stack() const {
 }
 
 
-inline jint frame::interpreter_frame_expression_stack_direction() { return -1; }
-
-
 // Entry frames
 
 inline JavaCallWrapper** frame::entry_frame_call_wrapper_addr() const {
@@ -229,10 +215,6 @@ inline JavaCallWrapper** frame::entry_frame_call_wrapper_addr() const {
 
 
 // Compiled frames
-
-inline bool frame::volatile_across_calls(Register reg) {
-  return true;
-}
 
 inline oop frame::saved_oop_result(RegisterMap* map) const {
   oop* result_adr = (oop*) map->location(R0->as_VMReg());

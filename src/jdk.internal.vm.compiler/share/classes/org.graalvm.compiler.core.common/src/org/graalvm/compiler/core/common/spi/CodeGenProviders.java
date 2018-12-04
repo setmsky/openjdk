@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.core.common.spi;
 
 import jdk.vm.ci.code.CodeCacheProvider;
@@ -39,6 +41,4 @@ public interface CodeGenProviders {
     ForeignCallsProvider getForeignCalls();
 
     ConstantReflectionProvider getConstantReflection();
-
-    ArrayOffsetProvider getArrayOffsetProvider();
 }

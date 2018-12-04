@@ -26,15 +26,15 @@
  * @test
  * @summary AppCDS handling of prohibited package.
  * @requires vm.cds
- * @requires vm.cds
  * @library /test/lib
  * @modules java.base/jdk.internal.misc
  *          java.management
  *          jdk.jartool/sun.tools.jar
  * @compile test-classes/ProhibitedHelper.java test-classes/Prohibited.jasm
- * @run main ProhibitedPackage
+ * @run driver ProhibitedPackage
  */
 
+import jdk.test.lib.cds.CDSOptions;
 import jdk.test.lib.Platform;
 import jdk.test.lib.process.OutputAnalyzer;
 
@@ -79,19 +79,20 @@ public class ProhibitedPackage {
         // -Xshare:on
         TestCommon.run(
             "-XX:+UnlockDiagnosticVMOptions", "-XX:+WhiteBoxAPI",
-            "-cp", appJar, "-Xlog:class+load=info", "ProhibitedHelper")
+            "-cp", appJar, "ProhibitedHelper")
           .assertNormalExit("Prohibited package name: java.lang");
 
         // -Xshare:auto
         output = TestCommon.execAuto(
             "-XX:+UnlockDiagnosticVMOptions", "-XX:+WhiteBoxAPI",
-            "-cp", appJar, "-Xlog:class+load=info", "ProhibitedHelper");
-        TestCommon.checkExec(output, "Prohibited package name: java.lang");
+            "-cp", appJar, "ProhibitedHelper");
+        CDSOptions opts = (new CDSOptions()).setXShareMode("auto");
+        TestCommon.checkExec(output, opts, "Prohibited package name: java.lang");
 
         // -Xshare:off
         output = TestCommon.execOff(
             "-XX:+UnlockDiagnosticVMOptions", "-XX:+WhiteBoxAPI",
-            "-cp", appJar, "-Xlog:class+load=info", "ProhibitedHelper");
+            "-cp", appJar, "ProhibitedHelper");
         output.shouldContain("Prohibited package name: java.lang");
     }
 }

@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.lir.constopt;
 
 import java.util.ArrayDeque;
@@ -127,7 +129,7 @@ public final class ConstantTreeAnalyzer {
 
         // choose block
         List<UseEntry> usagesBlock = tree.getUsages(block);
-        double probabilityBlock = block.probability();
+        double probabilityBlock = block.getRelativeFrequency();
 
         if (!usagesBlock.isEmpty() || shouldMaterializerInCurrentBlock(probabilityBlock, bestCost, numMat)) {
             // mark current block as potential materialization position

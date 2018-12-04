@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.nodes.calc;
 
 import java.nio.ByteOrder;
@@ -67,7 +69,7 @@ public final class UnpackEndianHalfNode extends UnaryNode implements Lowerable {
 
     @Override
     public Node canonical(CanonicalizerTool tool, ValueNode forValue) {
-        if (forValue.isConstant() && forValue.asConstant().isDefaultForKind()) {
+        if (forValue.isDefaultConstant()) {
             return ConstantNode.defaultForKind(stamp.getStackKind());
         }
         return this;

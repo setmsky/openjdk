@@ -27,10 +27,12 @@
 #include "gc/shared/collectorPolicy.hpp"
 #include "gc/shared/gcCause.hpp"
 #include "gc/shared/gcUtil.inline.hpp"
+#include "gc/shared/softRefPolicy.hpp"
 #include "gc/shared/workgroup.hpp"
 #include "logging/log.hpp"
 #include "runtime/timer.hpp"
 #include "utilities/ostream.hpp"
+
 elapsedTimer AdaptiveSizePolicy::_minor_timer;
 elapsedTimer AdaptiveSizePolicy::_major_timer;
 bool AdaptiveSizePolicy::_debug_perturbation = false;
@@ -47,16 +49,16 @@ AdaptiveSizePolicy::AdaptiveSizePolicy(size_t init_eden_size,
                                        size_t init_survivor_size,
                                        double gc_pause_goal_sec,
                                        uint gc_cost_ratio) :
+    _throughput_goal(1.0 - double(1.0 / (1.0 + (double) gc_cost_ratio))),
     _eden_size(init_eden_size),
     _promo_size(init_promo_size),
     _survivor_size(init_survivor_size),
-    _gc_pause_goal_sec(gc_pause_goal_sec),
-    _throughput_goal(1.0 - double(1.0 / (1.0 + (double) gc_cost_ratio))),
     _gc_overhead_limit_exceeded(false),
     _print_gc_overhead_limit_would_be_exceeded(false),
     _gc_overhead_limit_count(0),
     _latest_minor_mutator_interval_seconds(0),
     _threshold_tolerance_percent(1.0 + ThresholdTolerance/100.0),
+    _gc_pause_goal_sec(gc_pause_goal_sec),
     _young_gen_change_for_minor_throughput(0),
     _old_gen_change_for_major_throughput(0) {
   assert(AdaptiveSizePolicyGCTimeLimitThreshold > 0,
@@ -409,7 +411,7 @@ void AdaptiveSizePolicy::check_gc_overhead_limit(
                                           size_t max_eden_size,
                                           bool   is_full_gc,
                                           GCCause::Cause gc_cause,
-                                          CollectorPolicy* collector_policy) {
+                                          SoftRefPolicy* soft_ref_policy) {
 
   // Ignore explicit GC's.  Exiting here does not set the flag and
   // does not reset the count.  Updating of the averages for system
@@ -506,7 +508,7 @@ void AdaptiveSizePolicy::check_gc_overhead_limit(
           // The clearing will be done on the next GC.
           bool near_limit = gc_overhead_limit_near();
           if (near_limit) {
-            collector_policy->set_should_clear_all_soft_refs(true);
+            soft_ref_policy->set_should_clear_all_soft_refs(true);
             log_trace(gc, ergo)("Nearing GC overhead limit, will be clearing all SoftReference");
           }
         }

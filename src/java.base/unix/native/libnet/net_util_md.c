@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -89,7 +89,9 @@ void setDefaultScopeID(JNIEnv *env, struct sockaddr *him)
     }
     int defaultIndex;
     struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)him;
-    if (sin6->sin6_family == AF_INET6 && (sin6->sin6_scope_id == 0)) {
+    if (sin6->sin6_family == AF_INET6 && (sin6->sin6_scope_id == 0) &&
+        (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) ||
+         IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr))) {
         defaultIndex = (*env)->GetStaticIntField(env, ni_class,
                                                  ni_defaultIndexID);
         sin6->sin6_scope_id = defaultIndex;
@@ -303,12 +305,12 @@ jint  IPv6_supported()
     }
 
     /*
-     * If fd 0 is a socket it means we've been launched from inetd or
+     * If fd 0 is a socket it means we may have been launched from inetd or
      * xinetd. If it's a socket then check the family - if it's an
      * IPv4 socket then we need to disable IPv6.
      */
     if (getsockname(0, &sa.sa, &sa_len) == 0) {
-        if (sa.sa.sa_family != AF_INET6) {
+        if (sa.sa.sa_family == AF_INET) {
             close(fd);
             return JNI_FALSE;
         }
@@ -762,6 +764,7 @@ NET_InetAddressToSockaddr(JNIEnv *env, jobject iaObj, int port,
                           jboolean v4MappedAddress)
 {
     jint family = getInetAddress_family(env, iaObj);
+    JNU_CHECK_EXCEPTION_RETURN(env, -1);
     memset((char *)sa, 0, sizeof(SOCKETADDRESS));
 
     if (ipv6_available() &&
@@ -775,6 +778,7 @@ NET_InetAddressToSockaddr(JNIEnv *env, jobject iaObj, int port,
             // convert to IPv4-mapped address
             memset((char *)caddr, 0, 16);
             address = getInetAddress_addr(env, iaObj);
+            JNU_CHECK_EXCEPTION_RETURN(env, -1);
             if (address == INADDR_ANY) {
                 /* we would always prefer IPv6 wildcard address
                  * caddr[10] = 0xff;
@@ -799,8 +803,12 @@ NET_InetAddressToSockaddr(JNIEnv *env, jobject iaObj, int port,
 
 #ifdef __linux__
         /*
-         * On Linux if we are connecting to a link-local address
-         * we need to specify the interface in the scope_id (2.4 kernel only)
+         * On Linux if we are connecting to a
+         *
+         *   - link-local address
+         *   - multicast interface-local or link-local address
+         *
+         * we need to specify the interface in the scope_id.
          *
          * If the scope was cached then we use the cached value. If not cached but
          * specified in the Inet6Address we use that, but we first check if the
@@ -810,7 +818,9 @@ NET_InetAddressToSockaddr(JNIEnv *env, jobject iaObj, int port,
          * we try to determine a value from the routing table. In all these
          * cases the used value is cached for further use.
          */
-        if (IN6_IS_ADDR_LINKLOCAL(&sa->sa6.sin6_addr)) {
+        if (IN6_IS_ADDR_LINKLOCAL(&sa->sa6.sin6_addr)
+            || IN6_IS_ADDR_MC_NODELOCAL(&sa->sa6.sin6_addr)
+            || IN6_IS_ADDR_MC_LINKLOCAL(&sa->sa6.sin6_addr)) {
             unsigned int cached_scope_id = 0, scope_id = 0;
 
             if (ia6_cachedscopeidID) {
@@ -869,6 +879,7 @@ NET_InetAddressToSockaddr(JNIEnv *env, jobject iaObj, int port,
             return -1;
         }
         address = getInetAddress_addr(env, iaObj);
+        JNU_CHECK_EXCEPTION_RETURN(env, -1);
         sa->sa4.sin_port = htons(port);
         sa->sa4.sin_addr.s_addr = htonl(address);
         sa->sa4.sin_family = AF_INET;
@@ -1076,7 +1087,7 @@ int getDefaultIPv6Interface(struct in6_addr *target_addr) {
              * dest_plen % 8    => number of additional bits to match
              *
              * eg: fe80::/10 => match 1 byte + 2 additional bits in the
-             *                  the next byte.
+             *                  next byte.
              */
             int byte_count = dest_plen >> 3;
             int extra_bits = dest_plen & 0x3;

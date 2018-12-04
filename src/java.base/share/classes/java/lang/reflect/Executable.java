@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,11 +26,14 @@
 package java.lang.reflect;
 
 import java.lang.annotation.*;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.StringJoiner;
+import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
-import jdk.internal.misc.SharedSecrets;
+import jdk.internal.access.SharedSecrets;
 import sun.reflect.annotation.AnnotationParser;
 import sun.reflect.annotation.AnnotationSupport;
 import sun.reflect.annotation.TypeAnnotationParser;
@@ -54,11 +57,6 @@ public abstract class Executable extends AccessibleObject
      * Accessor method to allow code sharing
      */
     abstract byte[] getAnnotationBytes();
-
-    /**
-     * Accessor method to allow code sharing
-     */
-    abstract Executable getRoot();
 
     /**
      * Does the Executable have generic information.
@@ -114,19 +112,15 @@ public abstract class Executable extends AccessibleObject
             printModifiersIfNonzero(sb, modifierMask, isDefault);
             specificToStringHeader(sb);
             sb.append('(');
-            StringJoiner sj = new StringJoiner(",");
-            for (Class<?> parameterType : parameterTypes) {
-                sj.add(parameterType.getTypeName());
-            }
-            sb.append(sj.toString());
+
+            sb.append(Stream.of(parameterTypes).map(Type::getTypeName).
+                      collect(Collectors.joining(",")));
+
             sb.append(')');
 
             if (exceptionTypes.length > 0) {
-                StringJoiner joiner = new StringJoiner(",", " throws ", "");
-                for (Class<?> exceptionType : exceptionTypes) {
-                    joiner.add(exceptionType.getTypeName());
-                }
-                sb.append(joiner.toString());
+                sb.append(Stream.of(exceptionTypes).map(Type::getTypeName).
+                          collect(Collectors.joining(",", " throws ", "")));
             }
             return sb.toString();
         } catch (Exception e) {
@@ -140,6 +134,17 @@ public abstract class Executable extends AccessibleObject
      */
     abstract void specificToStringHeader(StringBuilder sb);
 
+    static String typeVarBounds(TypeVariable<?> typeVar) {
+        Type[] bounds = typeVar.getBounds();
+        if (bounds.length == 1 && bounds[0].equals(Object.class)) {
+            return typeVar.getName();
+        } else {
+            return typeVar.getName() + " extends " +
+                Stream.of(bounds).map(Type::getTypeName).
+                collect(Collectors.joining(" & "));
+        }
+    }
+
     String sharedToGenericString(int modifierMask, boolean isDefault) {
         try {
             StringBuilder sb = new StringBuilder();
@@ -148,11 +153,8 @@ public abstract class Executable extends AccessibleObject
 
             TypeVariable<?>[] typeparms = getTypeParameters();
             if (typeparms.length > 0) {
-                StringJoiner sj = new StringJoiner(",", "<", "> ");
-                for(TypeVariable<?> typeparm: typeparms) {
-                    sj.add(typeparm.getTypeName());
-                }
-                sb.append(sj.toString());
+                sb.append(Stream.of(typeparms).map(Executable::typeVarBounds).
+                          collect(Collectors.joining(",", "<", "> ")));
             }
 
             specificToGenericStringHeader(sb);
@@ -171,11 +173,8 @@ public abstract class Executable extends AccessibleObject
 
             Type[] exceptionTypes = getGenericExceptionTypes();
             if (exceptionTypes.length > 0) {
-                StringJoiner joiner = new StringJoiner(",", " throws ", "");
-                for (Type exceptionType : exceptionTypes) {
-                    joiner.add(exceptionType.getTypeName());
-                }
-                sb.append(joiner.toString());
+                sb.append(Stream.of(exceptionTypes).map(Type::getTypeName).
+                          collect(Collectors.joining(",", " throws ", "")));
             }
             return sb.toString();
         } catch (Exception e) {
@@ -225,6 +224,10 @@ public abstract class Executable extends AccessibleObject
     // returns shared array of parameter types - must never give it out
     // to the untrusted code...
     abstract Class<?>[] getSharedParameterTypes();
+
+    // returns shared array of exception types - must never give it out
+    // to the untrusted code...
+    abstract Class<?>[] getSharedExceptionTypes();
 
     /**
      * Returns an array of {@code Class} objects that represent the formal
@@ -598,7 +601,7 @@ public abstract class Executable extends AccessibleObject
         if ((declAnnos = declaredAnnotations) == null) {
             synchronized (this) {
                 if ((declAnnos = declaredAnnotations) == null) {
-                    Executable root = getRoot();
+                    Executable root = (Executable)getRoot();
                     if (root != null) {
                         declAnnos = root.declaredAnnotations();
                     } else {

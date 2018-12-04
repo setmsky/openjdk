@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.lir.amd64;
 
 import org.graalvm.compiler.lir.Variable;
@@ -36,6 +38,14 @@ public interface AMD64ArithmeticLIRGeneratorTool extends ArithmeticLIRGeneratorT
     Value emitCountLeadingZeros(Value value);
 
     Value emitCountTrailingZeros(Value value);
+
+    Value emitLogicalAndNot(Value value1, Value value2);
+
+    Value emitLowestSetIsolatedBit(Value value);
+
+    Value emitGetMaskUpToLowestSetBit(Value value);
+
+    Value emitResetLowestSetBit(Value value);
 
     enum RoundingMode {
         NEAREST(0),

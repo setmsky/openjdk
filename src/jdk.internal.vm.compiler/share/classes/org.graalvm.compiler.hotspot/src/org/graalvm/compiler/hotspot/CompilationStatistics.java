@@ -20,9 +20,9 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package org.graalvm.compiler.hotspot;
 
-import static java.lang.Thread.currentThread;
+
+package org.graalvm.compiler.hotspot;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -35,17 +35,16 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.Deque;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 import org.graalvm.compiler.debug.CSVUtil;
-import org.graalvm.compiler.debug.Management;
 import org.graalvm.compiler.options.Option;
 import org.graalvm.compiler.options.OptionKey;
 import org.graalvm.compiler.options.OptionValues;
+import org.graalvm.compiler.serviceprovider.GraalServices;
 
 import jdk.vm.ci.hotspot.HotSpotInstalledCode;
 import jdk.vm.ci.hotspot.HotSpotResolvedJavaMethod;
@@ -87,8 +86,7 @@ public final class CompilationStatistics {
     private static long zeroTime = System.nanoTime();
 
     private static long getThreadAllocatedBytes() {
-        com.sun.management.ThreadMXBean thread = (com.sun.management.ThreadMXBean) Management.getThreadMXBean();
-        return thread.getThreadAllocatedBytes(currentThread().getId());
+        return GraalServices.getCurrentThreadAllocatedBytes();
     }
 
     @NotReported private final long startTime;

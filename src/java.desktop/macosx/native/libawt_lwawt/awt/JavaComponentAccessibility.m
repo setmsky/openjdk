@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -54,6 +54,7 @@
 // If the value is >=0, it's an index
 
 static JNF_STATIC_MEMBER_CACHE(jm_getChildrenAndRoles, sjc_CAccessibility, "getChildrenAndRoles", "(Ljavax/accessibility/Accessible;Ljava/awt/Component;IZ)[Ljava/lang/Object;");
+static JNF_STATIC_MEMBER_CACHE(jm_getTableInfo, sjc_CAccessibility, "getTableInfo", "(Ljavax/accessibility/Accessible;Ljava/awt/Component;I)I");
 static JNF_STATIC_MEMBER_CACHE(sjm_getAccessibleComponent, sjc_CAccessibility, "getAccessibleComponent", "(Ljavax/accessibility/Accessible;Ljava/awt/Component;)Ljavax/accessibility/AccessibleComponent;");
 static JNF_STATIC_MEMBER_CACHE(sjm_getAccessibleValue, sjc_CAccessibility, "getAccessibleValue", "(Ljavax/accessibility/Accessible;Ljava/awt/Component;)Ljavax/accessibility/AccessibleValue;");
 static JNF_STATIC_MEMBER_CACHE(sjm_getAccessibleName, sjc_CAccessibility, "getAccessibleName", "(Ljavax/accessibility/Accessible;Ljava/awt/Component;)Ljava/lang/String;");
@@ -115,6 +116,14 @@ static NSObject *sAttributeNamesLOCK = nil;
 - (BOOL)accessibilityIsVerticalScrollBarAttributeSettable;
 - (id)accessibilityHorizontalScrollBarAttribute;
 - (BOOL)accessibilityIsHorizontalScrollBarAttributeSettable;
+@end
+
+@interface TableAccessibility : JavaComponentAccessibility {
+
+}
+- (NSArray *)initializeAttributeNamesWithEnv:(JNIEnv *)env;
+- (NSArray *)accessibilityRowsAttribute;
+- (NSArray *)accessibilityColumnsAttribute;
 @end
 
 
@@ -325,15 +334,15 @@ static NSObject *sAttributeNamesLOCK = nil;
         }
 
         JavaComponentAccessibility *child = [self createWithParent:parent accessible:jchild role:childJavaRole index:childIndex withEnv:env withView:parent->fView];
-        
+
         (*env)->DeleteLocalRef(env, jchild);
         (*env)->DeleteLocalRef(env, jchildJavaRole);
-        
+
         [children addObject:child];
         childIndex++;
     }
     (*env)->DeleteLocalRef(env, jchildrenAndRoles);
-    
+
     return children;
 }
 
@@ -370,6 +379,8 @@ static NSObject *sAttributeNamesLOCK = nil;
     JavaComponentAccessibility *newChild = nil;
     if ([javaRole isEqualToString:@"pagetablist"]) {
         newChild = [TabGroupAccessibility alloc];
+    } else if ([javaRole isEqualToString:@"table"]) {
+        newChild = [TableAccessibility alloc];
     } else if ([javaRole isEqualToString:@"scrollpane"]) {
         newChild = [ScrollAreaAccessibility alloc];
     } else {
@@ -454,8 +465,9 @@ static NSObject *sAttributeNamesLOCK = nil;
     }
 
     // if it's a pagetab / radiobutton, it has a value but no min/max value.
+    // if it is a slider, supplying only the value makes it to voice out the value instead of percentages
     BOOL hasAxValue = attributeStatesArray[2];
-    if ([javaRole isEqualToString:@"pagetab"] || [javaRole isEqualToString:@"radiobutton"]) {
+    if ([javaRole isEqualToString:@"pagetab"] || [javaRole isEqualToString:@"radiobutton"] || [javaRole isEqualToString:@"slider"]) {
         [attributeNames addObject:NSAccessibilityValueAttribute];
     } else {
         // if not a pagetab/radio button, and it has a value, it has a min/max/current value.
@@ -484,7 +496,8 @@ static NSObject *sAttributeNamesLOCK = nil;
     // children
     if (attributeStatesArray[6]) {
         [attributeNames addObject:NSAccessibilityChildrenAttribute];
-        if ([javaRole isEqualToString:@"list"]) {
+        if ([javaRole isEqualToString:@"list"]
+                || [javaRole isEqualToString:@"table"]) {
             [attributeNames addObject:NSAccessibilitySelectedChildrenAttribute];
             [attributeNames addObject:NSAccessibilityVisibleChildrenAttribute];
         }
@@ -646,10 +659,15 @@ static NSObject *sAttributeNamesLOCK = nil;
         }
         // The above set of attributes is immutable per role, but some objects, if
         // they are the child of a list, need to add the selected and index attributes.
+        if ([self accessibilityIsIgnored]) {
+            return names;
+        }
         id myParent = [self accessibilityParentAttribute];
         if ([myParent isKindOfClass:[JavaComponentAccessibility class]]) {
             NSString *parentRole = [(JavaComponentAccessibility *)myParent javaRole];
-            if ([parentRole isEqualToString:@"list"]) {
+
+            if ([parentRole isEqualToString:@"list"]
+                    || [parentRole isEqualToString:@"table"]) {
                 NSMutableArray *moreNames =
                     [[NSMutableArray alloc] initWithCapacity: [names count] + 2];
                 [moreNames addObjectsFromArray: names];
@@ -1060,7 +1078,7 @@ static NSObject *sAttributeNamesLOCK = nil;
                                     sjc_CAccessibility,
                                     "requestSelection",
                                     "(Ljavax/accessibility/Accessible;Ljava/awt/Component;)V" );
-    
+
     if ([(NSNumber*)value boolValue]) {
         JNIEnv* env = [ThreadUtilities getJNIEnv];
         JNFCallStaticVoidMethod(env, jm_requestSelection, fAccessible, fComponent); // AWT_THREADING Safe (AWTRunLoop)
@@ -1167,7 +1185,7 @@ static NSObject *sAttributeNamesLOCK = nil;
     // Need to handle popupmenus differently.
     //
     // At least for now don't handle combo box menus.
-    // This may change when later fixing issues which currently 
+    // This may change when later fixing issues which currently
     // exist for combo boxes, but for now the following is only
     // for JPopupMenus, not for combobox menus.
     id parent = [self parent];
@@ -1349,7 +1367,7 @@ static NSObject *sAttributeNamesLOCK = nil;
     NSWindow* hostWindow = [[self->fView window] retain];
     jobject focused = JNFCallStaticObjectMethod(env, jm_getFocusOwner, fComponent); // AWT_THREADING Safe (AWTRunLoop)
     [hostWindow release];
-    
+
     if (focused != NULL) {
         if (JNFIsInstanceOf(env, focused, &sjc_Accessible)) {
             value = [JavaComponentAccessibility createWithAccessible:focused withEnv:env withView:fView];
@@ -1842,6 +1860,41 @@ static BOOL ObjectEquals(JNIEnv *env, jobject a, jobject b, jobject component);
     return NO;
 }
 
+@end
+
+// these constants are duplicated in CAccessibility.java
+#define JAVA_AX_ROWS (1)
+#define JAVA_AX_COLS (2)
+
+@implementation TableAccessibility
+
+- (NSArray *)initializeAttributeNamesWithEnv:(JNIEnv *)env
+{
+    NSMutableArray *names = (NSMutableArray *)[super initializeAttributeNamesWithEnv:env];
+
+    [names addObject:NSAccessibilityRowCountAttribute];
+    [names addObject:NSAccessibilityColumnCountAttribute];
+    return names;
+}
+
+- (id)getTableInfo:(jint)info {
+    if (fAccessible == NULL) return 0;
+
+    JNIEnv* env = [ThreadUtilities getJNIEnv];
+    jint count = JNFCallStaticIntMethod(env, jm_getTableInfo, fAccessible,
+                                        fComponent, info);
+    NSNumber *index = [NSNumber numberWithInt:count];
+    return index;
+}
+
+
+- (id)accessibilityRowCountAttribute {
+    return [self getTableInfo:JAVA_AX_ROWS];
+}
+
+- (id)accessibilityColumnCountAttribute {
+    return [self getTableInfo:JAVA_AX_COLS];
+}
 @end
 
 /*

@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.core.test;
 
 import java.io.IOException;
@@ -27,7 +29,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import org.graalvm.collections.EconomicMap;
+import jdk.internal.vm.compiler.collections.EconomicMap;
 import org.graalvm.compiler.debug.DebugOptions;
 import org.graalvm.compiler.options.OptionKey;
 import org.graalvm.compiler.options.OptionValues;
@@ -45,6 +47,7 @@ public class DumpPathTest extends GraalCompilerTest {
 
     @Test
     public void testDump() throws IOException {
+        assumeManagementLibraryIsLoadable();
         Path dumpDirectoryPath = Files.createTempDirectory("DumpPathTest");
         String[] extensions = new String[]{".cfg", ".bgv", ".graph-strings"};
         EconomicMap<OptionKey<?>, Object> overrides = OptionValues.newOptionMap();

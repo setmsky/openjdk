@@ -20,10 +20,11 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.nodes.extended;
 
 import static org.graalvm.compiler.core.common.GraalOptions.GeneratePIC;
-
 import static org.graalvm.compiler.nodeinfo.NodeCycles.CYCLES_2;
 import static org.graalvm.compiler.nodeinfo.NodeSize.SIZE_1;
 
@@ -119,7 +120,7 @@ public final class LoadHubNode extends FloatingNode implements Lowerable, Canoni
             ValueNode alias = tool.getAlias(getValue());
             TypeReference type = StampTool.typeReferenceOrNull(alias);
             if (type != null && type.isExact()) {
-                tool.replaceWithValue(ConstantNode.forConstant(stamp(NodeView.DEFAULT), tool.getConstantReflectionProvider().asObjectHub(type.getType()), tool.getMetaAccessProvider(), graph()));
+                tool.replaceWithValue(ConstantNode.forConstant(stamp(NodeView.DEFAULT), tool.getConstantReflection().asObjectHub(type.getType()), tool.getMetaAccess(), graph()));
             }
         }
     }

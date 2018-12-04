@@ -20,13 +20,15 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.phases.common;
 
 import org.graalvm.compiler.graph.Graph.NodeEventScope;
 import org.graalvm.compiler.nodes.StructuredGraph;
 import org.graalvm.compiler.phases.BasePhase;
 import org.graalvm.compiler.phases.PhaseSuite;
-import org.graalvm.compiler.phases.common.util.HashSetNodeEventListener;
+import org.graalvm.compiler.phases.common.util.EconomicSetNodeEventListener;
 import org.graalvm.compiler.phases.tiers.PhaseContext;
 
 /**
@@ -49,7 +51,7 @@ public class IncrementalCanonicalizerPhase<C extends PhaseContext> extends Phase
     @Override
     @SuppressWarnings("try")
     protected void run(StructuredGraph graph, C context) {
-        HashSetNodeEventListener listener = new HashSetNodeEventListener();
+        EconomicSetNodeEventListener listener = new EconomicSetNodeEventListener();
         try (NodeEventScope nes = graph.trackNodeEvents(listener)) {
             super.run(graph, context);
         }

@@ -26,20 +26,11 @@
 #define OS_CPU_LINUX_ARM_VM_COPY_LINUX_ARM_INLINE_HPP
 
 static void pd_conjoint_words(const HeapWord* from, HeapWord* to, size_t count) {
-#ifdef AARCH64
   _Copy_conjoint_words(from, to, count * HeapWordSize);
-#else
-   // NOTE: _Copy_* functions on 32-bit ARM expect "to" and "from" arguments in reversed order
-  _Copy_conjoint_words(to, from, count * HeapWordSize);
-#endif
 }
 
 static void pd_disjoint_words(const HeapWord* from, HeapWord* to, size_t count) {
-#ifdef AARCH64
   _Copy_disjoint_words(from, to, count * HeapWordSize);
-#else
-  _Copy_disjoint_words(to, from, count * HeapWordSize);
-#endif // AARCH64
 }
 
 static void pd_disjoint_words_atomic(const HeapWord* from, HeapWord* to, size_t count) {
@@ -63,45 +54,22 @@ static void pd_conjoint_bytes_atomic(const void* from, void* to, size_t count) {
 }
 
 static void pd_conjoint_jshorts_atomic(const jshort* from, jshort* to, size_t count) {
-#ifdef AARCH64
   _Copy_conjoint_jshorts_atomic(from, to, count * BytesPerShort);
-#else
-  _Copy_conjoint_jshorts_atomic(to, from, count * BytesPerShort);
-#endif
 }
 
 static void pd_conjoint_jints_atomic(const jint* from, jint* to, size_t count) {
-#ifdef AARCH64
-  _Copy_conjoint_jints_atomic(from, to, count * BytesPerInt);
-#else
   assert(HeapWordSize == BytesPerInt, "heapwords and jints must be the same size");
   // pd_conjoint_words is word-atomic in this implementation.
   pd_conjoint_words((const HeapWord*)from, (HeapWord*)to, count);
-#endif
 }
 
 static void pd_conjoint_jlongs_atomic(const jlong* from, jlong* to, size_t count) {
-#ifdef AARCH64
-  assert(HeapWordSize == BytesPerLong, "64-bit architecture");
-  pd_conjoint_words((const HeapWord*)from, (HeapWord*)to, count);
-#else
-  _Copy_conjoint_jlongs_atomic(to, from, count * BytesPerLong);
-#endif
+  _Copy_conjoint_jlongs_atomic(from, to, count * BytesPerLong);
 }
 
 static void pd_conjoint_oops_atomic(const oop* from, oop* to, size_t count) {
-#ifdef AARCH64
-  if (UseCompressedOops) {
-    assert(BytesPerHeapOop == BytesPerInt, "compressed oops");
-    pd_conjoint_jints_atomic((const jint*)from, (jint*)to, count);
-  } else {
-    assert(BytesPerHeapOop == BytesPerLong, "64-bit architecture");
-    pd_conjoint_jlongs_atomic((const jlong*)from, (jlong*)to, count);
-  }
-#else
   assert(BytesPerHeapOop == BytesPerInt, "32-bit architecture");
   pd_conjoint_jints_atomic((const jint*)from, (jint*)to, count);
-#endif
 }
 
 static void pd_arrayof_conjoint_bytes(const HeapWord* from, HeapWord* to, size_t count) {

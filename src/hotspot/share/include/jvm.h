@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -111,13 +111,18 @@ JNIEXPORT void JNICALL
 JVM_ArrayCopy(JNIEnv *env, jclass ignored, jobject src, jint src_pos,
               jobject dst, jint dst_pos, jint length);
 
-JNIEXPORT jobject JNICALL
-JVM_InitProperties(JNIEnv *env, jobject p);
-
+/*
+ * Return an array of all properties as alternating name and value pairs.
+ */
+JNIEXPORT jobjectArray JNICALL
+JVM_GetProperties(JNIEnv *env);
 
 /*
  * java.lang.Runtime
  */
+JNIEXPORT void JNICALL
+JVM_BeforeHalt();
+
 JNIEXPORT void JNICALL
 JVM_Halt(jint code);
 
@@ -168,6 +173,8 @@ JVM_IsSupportedJNIVersion(jint version);
 JNIEXPORT jobjectArray JNICALL
 JVM_GetVmArguments(JNIEnv *env);
 
+JNIEXPORT void JNICALL
+JVM_InitializeFromArchive(JNIEnv* env, jclass cls);
 
 /*
  * java.lang.Throwable
@@ -519,6 +526,17 @@ JVM_GetClassDeclaredConstructors(JNIEnv *env, jclass ofClass, jboolean publicOnl
 JNIEXPORT jint JNICALL
 JVM_GetClassAccessFlags(JNIEnv *env, jclass cls);
 
+/* Nestmates - since JDK 11 */
+
+JNIEXPORT jboolean JNICALL
+JVM_AreNestMates(JNIEnv *env, jclass current, jclass member);
+
+JNIEXPORT jclass JNICALL
+JVM_GetNestHost(JNIEnv *env, jclass current);
+
+JNIEXPORT jobjectArray JNICALL
+JVM_GetNestMembers(JNIEnv *env, jclass current);
+
 /* The following two reflection routines are still needed due to startup time issues */
 /*
  * java.lang.reflect.Method
@@ -603,10 +621,6 @@ JVM_GetMethodParameters(JNIEnv *env, jobject method);
 /*
  * java.security.*
  */
-
-JNIEXPORT jobject JNICALL
-JVM_DoPrivileged(JNIEnv *env, jclass cls,
-                 jobject action, jobject context, jboolean wrapException);
 
 JNIEXPORT jobject JNICALL
 JVM_GetInheritedAccessControlContext(JNIEnv *env, jclass cls);

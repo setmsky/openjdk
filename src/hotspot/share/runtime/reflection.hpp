@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -73,8 +73,6 @@ class Reflection: public AllStatic {
   // Reflective array access. Returns type code. Throws ArrayIndexOutOfBoundsException.
   static BasicType array_get(jvalue* value, arrayOop a, int index, TRAPS);
   static void      array_set(jvalue* value, arrayOop a, int index, BasicType value_type, TRAPS);
-  // Returns mirror on array element type (NULL for basic type arrays and non-arrays).
-  static oop       array_component_type(oop mirror, TRAPS);
 
   // Object creation
   static arrayOop reflect_new_array(oop element_mirror, jint length, TRAPS);
@@ -90,12 +88,13 @@ class Reflection: public AllStatic {
                                           const InstanceKlass* new_class,
                                           const VerifyClassAccessResults result);
 
-  static bool     verify_field_access(const Klass* current_class,
-                                      const Klass* resolved_class,
-                                      const Klass* field_class,
-                                      AccessFlags access,
-                                      bool classloader_only,
-                                      bool protected_restriction = false);
+  static bool     verify_member_access(const Klass* current_class,
+                                       const Klass* resolved_class,
+                                       const Klass* member_class,
+                                       AccessFlags access,
+                                       bool classloader_only,
+                                       bool protected_restriction,
+                                       TRAPS);
   static bool     is_same_class_package(const Klass* class1, const Klass* class2);
 
   // inner class reflection

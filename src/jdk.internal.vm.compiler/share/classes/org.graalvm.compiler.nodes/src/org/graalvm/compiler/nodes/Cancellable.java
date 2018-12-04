@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.nodes;
 
 import org.graalvm.compiler.core.common.CancellationBailoutException;
@@ -31,5 +33,8 @@ import org.graalvm.compiler.core.common.CancellationBailoutException;
  * {@link CancellationBailoutException}.
  */
 public interface Cancellable {
+    /**
+     * Determines if this task has been cancelled.
+     */
     boolean isCancelled();
 }

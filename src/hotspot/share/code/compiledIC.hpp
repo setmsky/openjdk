@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -59,7 +59,21 @@
 // transition is made to a stub.
 //
 class CompiledIC;
+class CompiledICProtectionBehaviour;
+class CompiledMethod;
 class ICStub;
+
+class CompiledICLocker: public StackObj {
+  CompiledMethod* _method;
+  CompiledICProtectionBehaviour* _behaviour;
+  bool _locked;
+
+public:
+  CompiledICLocker(CompiledMethod* method);
+  ~CompiledICLocker();
+  static bool is_safe(CompiledMethod* method);
+  static bool is_safe(address code);
+};
 
 class CompiledICInfo : public StackObj {
  private:
@@ -126,7 +140,7 @@ class CompiledICInfo : public StackObj {
   }
 
   CompiledICInfo(): _entry(NULL), _cached_value(NULL), _is_icholder(false),
-                    _to_interpreter(false), _to_aot(false), _is_optimized(false), _release_icholder(false) {
+                    _is_optimized(false), _to_interpreter(false), _to_aot(false), _release_icholder(false) {
   }
   ~CompiledICInfo() {
     // In rare cases the info is computed but not used, so release any
@@ -358,7 +372,7 @@ public:
   virtual address destination() const = 0;
 
   // Clean static call (will force resolving on next use)
-  void set_to_clean();
+  void set_to_clean(bool in_use = true);
 
   // Set state. The entry must be the same, as computed by compute_entry.
   // Computation and setting is split up, since the actions are separate during

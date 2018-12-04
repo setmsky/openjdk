@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -608,26 +608,17 @@ final class HttpsClient extends HttpClient
             HostnameChecker checker = HostnameChecker.getInstance(
                                                 HostnameChecker.TYPE_TLS);
 
-            // Use ciphersuite to determine whether Kerberos is present.
-            if (cipher.startsWith("TLS_KRB5")) {
-                if (!HostnameChecker.match(host, getPeerPrincipal())) {
-                    throw new SSLPeerUnverifiedException("Hostname checker" +
-                                " failed for Kerberos");
-                }
-            } else { // X.509
+            // get the subject's certificate
+            peerCerts = session.getPeerCertificates();
 
-                // get the subject's certificate
-                peerCerts = session.getPeerCertificates();
-
-                X509Certificate peerCert;
-                if (peerCerts[0] instanceof
-                        java.security.cert.X509Certificate) {
-                    peerCert = (java.security.cert.X509Certificate)peerCerts[0];
-                } else {
-                    throw new SSLPeerUnverifiedException("");
-                }
-                checker.match(host, peerCert);
+            X509Certificate peerCert;
+            if (peerCerts[0] instanceof
+                    java.security.cert.X509Certificate) {
+                peerCert = (java.security.cert.X509Certificate)peerCerts[0];
+            } else {
+                throw new SSLPeerUnverifiedException("");
             }
+            checker.match(host, peerCert);
 
             // if it doesn't throw an exception, we passed. Return.
             return;
@@ -745,6 +736,13 @@ final class HttpsClient extends HttpClient
             }
         }
         return principal;
+    }
+
+    /**
+     * Returns the {@code SSLSession} in use on this connection.
+     */
+    SSLSession getSSLSession() {
+        return session;
     }
 
     /**

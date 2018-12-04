@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -37,6 +37,10 @@
 #endif
 #ifndef ALWAYSINLINE
 #define ALWAYSINLINE inline
+#endif
+
+#ifndef ATTRIBUTE_ALIGNED
+#define ATTRIBUTE_ALIGNED(x)
 #endif
 
 // This file holds all globally used constants & types, class (forward)
@@ -159,15 +163,6 @@ const int BitsPerSize_t      = size_tSize * BitsPerByte;
 
 // Size of a char[] needed to represent a jint as a string in decimal.
 const int jintAsStringSize = 12;
-
-// In fact this should be
-// log2_intptr(sizeof(class JavaThread)) - log2_intptr(64);
-// see os::set_memory_serialize_page()
-#ifdef _LP64
-const int SerializePageShiftCount = 4;
-#else
-const int SerializePageShiftCount = 3;
-#endif
 
 // An opaque struct of heap-word width, so that HeapWord* can be a generic
 // pointer into the heap.  We require that object sizes be measured in
@@ -418,13 +413,14 @@ const jint max_jint = (juint)min_jint - 1;                     // 0x7FFFFFFF == 
 const int max_method_code_size = 64*K - 1;  // JVM spec, 2nd ed. section 4.8.1 (p.134)
 
 //----------------------------------------------------------------------------------------------------
-// Default and minimum StringTableSize values
+// Default and minimum StringTable and SymbolTable size values
+// Must be a power of 2
 
-const int defaultStringTableSize = NOT_LP64(1009) LP64_ONLY(60013);
-const int minimumStringTableSize = 1009;
+const size_t defaultStringTableSize = NOT_LP64(1024) LP64_ONLY(65536);
+const size_t minimumStringTableSize = 128;
 
-const int defaultSymbolTableSize = 20011;
-const int minimumSymbolTableSize = 1009;
+const size_t defaultSymbolTableSize = 32768; // 2^15
+const size_t minimumSymbolTableSize = 1024;
 
 
 //----------------------------------------------------------------------------------------------------
@@ -920,7 +916,6 @@ class LocationValue;
 class ConstantValue;
 class IllegalValue;
 
-class PrivilegedElement;
 class MonitorArray;
 
 class MonitorInfo;
@@ -939,15 +934,12 @@ class JavaValue;
 class methodHandle;
 class JavaCallArguments;
 
-// Basic support for errors.
-extern void basic_fatal(const char* msg);
-
 //----------------------------------------------------------------------------------------------------
 // Special constants for debugging
 
 const jint     badInt           = -3;                       // generic "bad int" value
-const long     badAddressVal    = -2;                       // generic "bad address" value
-const long     badOopVal        = -1;                       // generic "bad oop" value
+const intptr_t badAddressVal    = -2;                       // generic "bad address" value
+const intptr_t badOopVal        = -1;                       // generic "bad oop" value
 const intptr_t badHeapOopVal    = (intptr_t) CONST64(0x2BAD4B0BBAADBABE); // value used to zap heap after GC
 const int      badStackSegVal   = 0xCA;                     // value used to zap stack segments
 const int      badHandleValue   = 0xBC;                     // value used to zap vm handle area
@@ -1015,12 +1007,6 @@ inline intptr_t bitfield(intptr_t x, int start_bit_no, int field_length) {
 #undef min
 #endif
 
-// The following defines serve the purpose of preventing use of accidentally
-// included min max macros from compiling, while continuing to allow innocent
-// min and max identifiers in the code to compile as intended.
-#define max max
-#define min min
-
 // It is necessary to use templates here. Having normal overloaded
 // functions does not work because it is necessary to provide both 32-
 // and 64-bit overloaded functions, which does not work, and having
@@ -1046,12 +1032,11 @@ inline bool is_power_of_2_long(jlong x) {
 }
 
 // Returns largest i such that 2^i <= x.
-// If x < 0, the function returns 31 on a 32-bit machine and 63 on a 64-bit machine.
 // If x == 0, the function returns -1.
-inline int log2_intptr(intptr_t x) {
+inline int log2_intptr(uintptr_t x) {
   int i = -1;
   uintptr_t p = 1;
-  while (p != 0 && p <= (uintptr_t)x) {
+  while (p != 0 && p <= x) {
     // p = 2^(i+1) && p <= x (i.e., 2^(i+1) <= x)
     i++; p *= 2;
   }
@@ -1061,17 +1046,42 @@ inline int log2_intptr(intptr_t x) {
 }
 
 //* largest i such that 2^i <= x
-//  A negative value of 'x' will return '63'
-inline int log2_long(jlong x) {
+inline int log2_long(julong x) {
   int i = -1;
   julong p =  1;
-  while (p != 0 && p <= (julong)x) {
+  while (p != 0 && p <= x) {
     // p = 2^(i+1) && p <= x (i.e., 2^(i+1) <= x)
     i++; p *= 2;
   }
   // p = 2^(i+1) && x < p (i.e., 2^i <= x < 2^(i+1))
   // (if p = 0 then overflow occurred and i = 63)
   return i;
+}
+
+// If x < 0, the function returns 31 on a 32-bit machine and 63 on a 64-bit machine.
+inline int log2_intptr(intptr_t x) {
+  return log2_intptr((uintptr_t)x);
+}
+
+inline int log2_int(int x) {
+  STATIC_ASSERT(sizeof(int) <= sizeof(uintptr_t));
+  return log2_intptr((uintptr_t)x);
+}
+
+inline int log2_jint(jint x) {
+  STATIC_ASSERT(sizeof(jint) <= sizeof(uintptr_t));
+  return log2_intptr((uintptr_t)x);
+}
+
+inline int log2_uint(uint x) {
+  STATIC_ASSERT(sizeof(uint) <= sizeof(uintptr_t));
+  return log2_intptr((uintptr_t)x);
+}
+
+//  A negative value of 'x' will return '63'
+inline int log2_jlong(jlong x) {
+  STATIC_ASSERT(sizeof(jlong) <= sizeof(julong));
+  return log2_long((julong)x);
 }
 
 //* the argument must be exactly a power of 2
@@ -1088,6 +1098,29 @@ inline int exact_log2_long(jlong x) {
 
 inline bool is_odd (intx x) { return x & 1;      }
 inline bool is_even(intx x) { return !is_odd(x); }
+
+// abs methods which cannot overflow and so are well-defined across
+// the entire domain of integer types.
+static inline unsigned int uabs(unsigned int n) {
+  union {
+    unsigned int result;
+    int value;
+  };
+  result = n;
+  if (value < 0) result = 0-result;
+  return result;
+}
+static inline julong uabs(julong n) {
+  union {
+    julong result;
+    jlong value;
+  };
+  result = n;
+  if (value < 0) result = 0-result;
+  return result;
+}
+static inline julong uabs(jlong n) { return uabs((julong)n); }
+static inline unsigned int uabs(int n) { return uabs((unsigned int)n); }
 
 // "to" should be greater than "from."
 inline intx byte_size(void* from, void* to) {
@@ -1267,5 +1300,25 @@ JAVA_INTEGER_OP(*, java_multiply, jlong, julong)
 static inline void* dereference_vptr(const void* addr) {
   return *(void**)addr;
 }
+
+//----------------------------------------------------------------------------------------------------
+// String type aliases used by command line flag declarations and
+// processing utilities.
+
+typedef const char* ccstr;
+typedef const char* ccstrlist;   // represents string arguments which accumulate
+
+//----------------------------------------------------------------------------------------------------
+// Default hash/equals functions used by ResourceHashtable and KVHashtable
+
+template<typename K> unsigned primitive_hash(const K& k) {
+  unsigned hash = (unsigned)((uintptr_t)k);
+  return hash ^ (hash >> 3); // just in case we're dealing with aligned ptrs
+}
+
+template<typename K> bool primitive_equals(const K& k0, const K& k1) {
+  return k0 == k1;
+}
+
 
 #endif // SHARE_VM_UTILITIES_GLOBALDEFINITIONS_HPP

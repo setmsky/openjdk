@@ -23,29 +23,35 @@
  */
 
 #include "precompiled.hpp"
-#include "classfile/classLoaderData.inline.hpp"
+#include "classfile/classLoaderDataGraph.inline.hpp"
 #include "code/compiledIC.hpp"
 #include "code/nmethod.hpp"
 #include "code/scopeDesc.hpp"
 #include "interpreter/interpreter.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/methodData.hpp"
-#include "oops/method.hpp"
+#include "oops/method.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "prims/nativeLookup.hpp"
-#include "runtime/advancedThresholdPolicy.hpp"
 #include "runtime/compilationPolicy.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/rframe.hpp"
-#include "runtime/simpleThresholdPolicy.hpp"
 #include "runtime/stubRoutines.hpp"
 #include "runtime/thread.hpp"
+#include "runtime/tieredThresholdPolicy.hpp"
 #include "runtime/timer.hpp"
 #include "runtime/vframe.hpp"
 #include "runtime/vm_operations.hpp"
 #include "utilities/events.hpp"
 #include "utilities/globalDefinitions.hpp"
+
+#ifdef COMPILER1
+#include "c1/c1_Compiler.hpp"
+#endif
+#ifdef COMPILER2
+#include "opto/c2compiler.hpp"
+#endif
 
 CompilationPolicy* CompilationPolicy::_policy;
 elapsedTimer       CompilationPolicy::_accumulated_time;
@@ -69,20 +75,13 @@ void compilationPolicy_init() {
     break;
   case 2:
 #ifdef TIERED
-    CompilationPolicy::set_policy(new SimpleThresholdPolicy());
-#else
-    Unimplemented();
-#endif
-    break;
-  case 3:
-#ifdef TIERED
-    CompilationPolicy::set_policy(new AdvancedThresholdPolicy());
+    CompilationPolicy::set_policy(new TieredThresholdPolicy());
 #else
     Unimplemented();
 #endif
     break;
   default:
-    fatal("CompilationPolicyChoice must be in the range: [0-3]");
+    fatal("CompilationPolicyChoice must be in the range: [0-2]");
   }
   CompilationPolicy::policy()->initialize();
 }
@@ -229,7 +228,20 @@ void NonTieredCompPolicy::initialize() {
     // Example: if CICompilerCountPerCPU is true, then we get
     // max(log2(8)-1,1) = 2 compiler threads on an 8-way machine.
     // May help big-app startup time.
-    _compiler_count = MAX2(log2_intptr(os::active_processor_count())-1,1);
+    _compiler_count = MAX2(log2_int(os::active_processor_count())-1,1);
+    // Make sure there is enough space in the code cache to hold all the compiler buffers
+    size_t buffer_size = 1;
+#ifdef COMPILER1
+    buffer_size = is_client_compilation_mode_vm() ? Compiler::code_buffer_size() : buffer_size;
+#endif
+#ifdef COMPILER2
+    buffer_size = is_server_compilation_mode_vm() ? C2Compiler::initial_code_buffer_size() : buffer_size;
+#endif
+    int max_count = (ReservedCodeCacheSize - (CodeCacheMinimumUseSpace DEBUG_ONLY(* 3))) / (int)buffer_size;
+    if (_compiler_count > max_count) {
+      // Lower the compiler count such that all buffers fit into the code cache
+      _compiler_count = MAX2(max_count, 1);
+    }
     FLAG_SET_ERGO(intx, CICompilerCount, _compiler_count);
   } else {
     _compiler_count = CICompilerCount;

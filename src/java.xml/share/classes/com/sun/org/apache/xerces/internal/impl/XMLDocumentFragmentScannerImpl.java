@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -21,6 +21,7 @@
 
 package com.sun.org.apache.xerces.internal.impl;
 
+import com.sun.org.apache.xerces.internal.impl.io.MalformedByteSequenceException;
 import com.sun.org.apache.xerces.internal.impl.msg.XMLMessageFormatter;
 import com.sun.org.apache.xerces.internal.util.AugmentationsImpl;
 import com.sun.org.apache.xerces.internal.util.XMLAttributesIteratorImpl;
@@ -45,6 +46,7 @@ import com.sun.org.apache.xerces.internal.xni.parser.XMLInputSource;
 import com.sun.xml.internal.stream.XMLBufferListener;
 import com.sun.xml.internal.stream.XMLEntityStorage;
 import com.sun.xml.internal.stream.dtd.DTDGrammarUtil;
+import java.io.CharConversionException;
 import java.io.EOFException;
 import java.io.IOException;
 import javax.xml.XMLConstants;
@@ -1632,6 +1634,8 @@ public class XMLDocumentFragmentScannerImpl
                     }
                 } else {
                     //CData partially returned due to the size limit
+                    fInCData = true;
+                    fCDataEnd = false;
                     break;
                 }
                 //by this time we have also read surrogate contents if any...
@@ -2926,7 +2930,11 @@ public class XMLDocumentFragmentScannerImpl
                         fUsebuffer = true;
                         //CDATA section is read up to the chunk size limit
                         scanCDATASection(fContentBuffer , true);
-                        setScannerState(SCANNER_STATE_CONTENT);
+                        if (!fCDataEnd) {
+                            setScannerState(SCANNER_STATE_CDATA);
+                        } else {
+                            setScannerState(SCANNER_STATE_CONTENT);
+                        }
                         //1. if fIsCoalesce is set to true we set the variable fLastSectionWasCData to true
                         //and just call fDispatche.next(). Since we have set the scanner state to
                         //SCANNER_STATE_CONTENT (super state) parser will automatically recover and
@@ -2939,9 +2947,6 @@ public class XMLDocumentFragmentScannerImpl
                             //there might be more data to coalesce.
                             continue;
                         } else if(fReportCdataEvent) {
-                            if (!fCDataEnd) {
-                                setScannerState(SCANNER_STATE_CDATA);
-                            }
                             return XMLEvent.CDATA;
                         } else {
                             return XMLEvent.CHARACTERS;
@@ -3075,6 +3080,20 @@ public class XMLDocumentFragmentScannerImpl
 
                 }//switch
             }
+             // encoding errors
+             catch (MalformedByteSequenceException e) {
+                 fErrorReporter.reportError(e.getDomain(), e.getKey(),
+                    e.getArguments(), XMLErrorReporter.SEVERITY_FATAL_ERROR, e);
+                 return -1;
+             }
+             catch (CharConversionException e) {
+                fErrorReporter.reportError(
+                        XMLMessageFormatter.XML_DOMAIN,
+                        "CharConversionFailure",
+                        null,
+                        XMLErrorReporter.SEVERITY_FATAL_ERROR, e);
+                 return -1;
+             }
             // premature end of file
             catch (EOFException e) {
                 endOfFileHook(e);

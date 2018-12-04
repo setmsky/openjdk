@@ -1807,13 +1807,14 @@ public class KeyStore {
                     keystore.load(dataStream, password);
                 } else {
                     keystore.keyStoreSpi.engineLoad(dataStream, param);
+                    keystore.initialized = true;
                 }
                 return keystore;
             }
         }
 
-        throw new KeyStoreException("Unrecognized keystore format: " +
-            keystore);
+        throw new KeyStoreException("This keystore does not support probing "
+                + "and must be loaded with a specified type");
     }
 
     /**

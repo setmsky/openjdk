@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.hotspot.nodes.type;
 
 import org.graalvm.compiler.core.common.CompressEncoding;
@@ -63,12 +65,8 @@ public final class HotSpotNarrowOopStamp extends NarrowOopStamp {
     }
 
     @Override
-    public JavaConstant asConstant() {
-        if (alwaysNull()) {
-            return HotSpotCompressedNullConstant.COMPRESSED_NULL;
-        } else {
-            return null;
-        }
+    public JavaConstant nullConstant() {
+        return HotSpotCompressedNullConstant.COMPRESSED_NULL;
     }
 
     @Override

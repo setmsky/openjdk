@@ -26,7 +26,10 @@
 #define SHARE_VM_RUNTIME_THREAD_INLINE_HPP
 
 #include "runtime/atomic.hpp"
+#include "runtime/globals.hpp"
+#include "runtime/orderAccess.hpp"
 #include "runtime/os.inline.hpp"
+#include "runtime/safepoint.hpp"
 #include "runtime/thread.hpp"
 
 inline void Thread::set_suspend_flag(SuspendFlags f) {
@@ -128,6 +131,26 @@ inline void JavaThread::set_thread_state(JavaThreadState s) {
 }
 #endif
 
+ThreadSafepointState* JavaThread::safepoint_state() const  {
+  return _safepoint_state;
+}
+
+void JavaThread::set_safepoint_state(ThreadSafepointState *state) {
+  _safepoint_state = state;
+}
+
+bool JavaThread::is_at_poll_safepoint() {
+  return _safepoint_state->is_at_poll_safepoint();
+}
+
+void JavaThread::enter_critical() {
+  assert(Thread::current() == this ||
+         (Thread::current()->is_VM_thread() &&
+         SafepointSynchronize::is_synchronizing()),
+         "this must be current thread or synchronizing");
+  _jni_active_critical++;
+}
+
 inline void JavaThread::set_done_attaching_via_jni() {
   _jni_attach_state = _attached_via_jni;
   OrderAccess::fence();
@@ -168,8 +191,13 @@ inline bool JavaThread::stack_guards_enabled() {
 
 // The release make sure this store is done after storing the handshake
 // operation or global state
-inline void JavaThread::set_polling_page(void* poll_value) {
+inline void JavaThread::set_polling_page_release(void* poll_value) {
   OrderAccess::release_store(polling_page_addr(), poll_value);
+}
+
+// Caller is responsible for using a memory barrier if needed.
+inline void JavaThread::set_polling_page(void* poll_value) {
+  *polling_page_addr() = poll_value;
 }
 
 // The aqcquire make sure reading of polling page is done before

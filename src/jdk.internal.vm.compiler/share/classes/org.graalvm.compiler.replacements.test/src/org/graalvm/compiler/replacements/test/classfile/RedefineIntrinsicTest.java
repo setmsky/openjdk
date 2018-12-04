@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.replacements.test.classfile;
 
 import static org.graalvm.compiler.test.SubprocessUtil.getVMCommandLine;
@@ -100,6 +102,7 @@ public class RedefineIntrinsicTest extends ReplacementsTest {
 
     @Test
     public void test() throws Throwable {
+        assumeManagementLibraryIsLoadable();
         try {
             Class.forName("java.lang.instrument.Instrumentation");
         } catch (ClassNotFoundException ex) {
@@ -196,6 +199,7 @@ public class RedefineIntrinsicTest extends ReplacementsTest {
         }
     }
 
+    @SuppressWarnings({"deprecation", "unused"})
     public static boolean loadAgent(Path agent) throws Exception {
         String vmName = ManagementFactory.getRuntimeMXBean().getName();
         int p = vmName.indexOf('@');

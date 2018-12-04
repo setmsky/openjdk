@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -102,7 +102,8 @@ public:
   static void gc_end(GCMemoryManager* manager, bool recordPostGCUsage,
                      bool recordAccumulatedGCTime,
                      bool recordGCEndTime, bool countCollection,
-                     GCCause::Cause cause);
+                     GCCause::Cause cause,
+                     bool allMemoryPoolsAffected);
 
   static void oops_do(OopClosure* f);
 
@@ -116,6 +117,7 @@ public:
 class TraceMemoryManagerStats : public StackObj {
 private:
   GCMemoryManager* _gc_memory_manager;
+  bool         _allMemoryPoolsAffected;
   bool         _recordGCBeginTime;
   bool         _recordPreGCUsage;
   bool         _recordPeakUsage;
@@ -128,6 +130,7 @@ public:
   TraceMemoryManagerStats() {}
   TraceMemoryManagerStats(GCMemoryManager* gc_memory_manager,
                           GCCause::Cause cause,
+                          bool allMemoryPoolsAffected = true,
                           bool recordGCBeginTime = true,
                           bool recordPreGCUsage = true,
                           bool recordPeakUsage = true,
@@ -138,6 +141,7 @@ public:
 
   void initialize(GCMemoryManager* gc_memory_manager,
                   GCCause::Cause cause,
+                  bool allMemoryPoolsAffected,
                   bool recordGCBeginTime,
                   bool recordPreGCUsage,
                   bool recordPeakUsage,

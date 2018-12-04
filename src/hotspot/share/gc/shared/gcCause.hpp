@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -52,8 +52,7 @@ class GCCause : public AllStatic {
     _wb_young_gc,
     _wb_conc_mark,
     _wb_full_gc,
-    _update_allocation_context_stats_inc,
-    _update_allocation_context_stats_full,
+    _archive_time_gc,
 
     /* implementation independent, but reserved for GC use */
     _no_gc,
@@ -79,6 +78,12 @@ class GCCause : public AllStatic {
     _g1_humongous_allocation,
 
     _dcmd_gc_run,
+
+    _z_timer,
+    _z_warmup,
+    _z_allocation_rate,
+    _z_allocation_stall,
+    _z_proactive,
 
     _last_gc_cause
   };

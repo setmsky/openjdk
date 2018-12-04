@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -45,7 +45,7 @@ import java.io.IOException;
  * A component that lets the user switch between a group of components by
  * clicking on a tab with a given title and/or icon.
  * For examples and information on using tabbed panes see
- * <a href="http://docs.oracle.com/javase/tutorial/uiswing/components/tabbedpane.html">How to Use Tabbed Panes</a>,
+ * <a href="https://docs.oracle.com/javase/tutorial/uiswing/components/tabbedpane.html">How to Use Tabbed Panes</a>,
  * a section in <em>The Java Tutorial</em>.
  * <p>
  * Tabs/components are added to a <code>TabbedPane</code> object by using the
@@ -1000,7 +1000,7 @@ public class JTabbedPane extends JComponent
         // container's children array indices, so make sure we
         // remove the correct child!
         if (component != null) {
-            Component components[] = getComponents();
+            Component[] components = getComponents();
             for (int i = components.length; --i >= 0; ) {
                 if (components[i] == component) {
                     super.remove(i);
@@ -1034,7 +1034,7 @@ public class JTabbedPane extends JComponent
         } else {
             // Container#remove(comp) invokes Container#remove(int)
             // so make sure JTabbedPane#remove(int) isn't called here
-            Component children[] = getComponents();
+            Component[] children = getComponents();
             for (int i=0; i < children.length; i++) {
                 if (component == children[i]) {
                     super.remove(i);
@@ -1548,7 +1548,7 @@ public class JTabbedPane extends JComponent
                 // why not if (page.component.getParent() == this) remove(component)
                 synchronized(getTreeLock()) {
                     int count = getComponentCount();
-                    Component children[] = getComponents();
+                    Component[] children = getComponents();
                     for (int i = 0; i < count; i++) {
                         if (children[i] == page.component) {
                             super.remove(i);

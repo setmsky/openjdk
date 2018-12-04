@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -123,16 +123,9 @@ class HeapRegionManager: public CHeapObj<mtGC> {
 public:
   bool is_free(HeapRegion* hr) const;
 #endif
-  // Returns whether the given region is available for allocation.
-  bool is_available(uint region) const;
-
- public:
+public:
   // Empty constructor, we'll initialize it with the initialize() method.
-  HeapRegionManager() : _regions(), _heap_mapper(NULL), _num_committed(0),
-                    _next_bitmap_mapper(NULL), _prev_bitmap_mapper(NULL), _bot_mapper(NULL),
-                    _allocated_heapregions_length(0), _available_map(mtGC),
-                    _free_list("Free list", new MasterFreeRegionListMtSafeChecker())
-  { }
+  HeapRegionManager();
 
   void initialize(G1RegionToSpaceMapper* heap_storage,
                   G1RegionToSpaceMapper* prev_bitmap,
@@ -150,6 +143,13 @@ public:
   // Return the HeapRegion at the given index. Assume that the index
   // is valid.
   inline HeapRegion* at(uint index) const;
+
+  // Return the HeapRegion at the given index, NULL if the index
+  // is for an unavailable region.
+  inline HeapRegion* at_or_null(uint index) const;
+
+  // Returns whether the given region is available for allocation.
+  bool is_available(uint region) const;
 
   // Return the next region (by index) that is part of the same
   // humongous object that hr is part of.

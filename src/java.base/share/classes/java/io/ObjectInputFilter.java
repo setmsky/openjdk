@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -34,10 +34,19 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
-import jdk.internal.misc.SharedSecrets;
+import jdk.internal.access.SharedSecrets;
 
 /**
  * Filter classes, array lengths, and graph metrics during deserialization.
+ *
+ * <p><strong>Warning: Deserialization of untrusted data is inherently dangerous
+ * and should be avoided. Untrusted data should be carefully validated according to the
+ * "Serialization and Deserialization" section of the
+ * {@extLink secure_coding_guidelines_javase Secure Coding Guidelines for Java SE}.
+ * {@extLink serialization_filter_guide Serialization Filtering} describes best
+ * practices for defensive use of serial filters.
+ * </strong></p>
+ *
  * If set on an {@link ObjectInputStream}, the {@link #checkInput checkInput(FilterInfo)}
  * method is called to validate classes, the length of each array,
  * the number of objects being read from the stream, the depth of the graph,

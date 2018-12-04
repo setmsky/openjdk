@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.replacements;
 
 import java.lang.reflect.Field;
@@ -31,7 +33,9 @@ import sun.misc.Unsafe;
  */
 class UnsafeAccess {
 
-    static final Unsafe UNSAFE = initUnsafe();
+    private static final Unsafe THE_UNSAFE = initUnsafe();
+
+    static final UnsafeAccess UNSAFE = new UnsafeAccess();
 
     private static Unsafe initUnsafe() {
         try {
@@ -47,5 +51,13 @@ class UnsafeAccess {
                 throw new RuntimeException("exception while trying to get Unsafe", e);
             }
         }
+    }
+
+    public char getChar(Object target, long l) {
+        return THE_UNSAFE.getChar(target, l);
+    }
+
+    public byte getByte(Object target, long l) {
+        return THE_UNSAFE.getByte(target, l);
     }
 }

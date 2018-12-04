@@ -27,7 +27,8 @@ package sun.security.tools.keytool;
 
 import java.io.*;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.Path;
+import java.security.AlgorithmParameters;
 import java.security.CodeSigner;
 import java.security.CryptoPrimitive;
 import java.security.KeyStore;
@@ -50,6 +51,8 @@ import java.security.cert.CertificateException;
 import java.security.cert.URICertStoreParameters;
 
 
+import java.security.interfaces.ECKey;
+import java.security.spec.ECParameterSpec;
 import java.text.Collator;
 import java.text.MessageFormat;
 import java.util.*;
@@ -67,7 +70,9 @@ import java.security.cert.X509CRLSelector;
 import javax.security.auth.x500.X500Principal;
 import java.util.Base64;
 
+import sun.security.util.ECKeySizeParameterSpec;
 import sun.security.util.KeyUtil;
+import sun.security.util.NamedCurve;
 import sun.security.util.ObjectIdentifier;
 import sun.security.pkcs10.PKCS10;
 import sun.security.pkcs10.PKCS10Attribute;
@@ -115,6 +120,7 @@ public final class Main {
     private String keyAlgName = null;
     private boolean verbose = false;
     private int keysize = -1;
+    private String groupName = null;
     private boolean rfc = false;
     private long validity = (long)90;
     private String alias = null;
@@ -159,7 +165,6 @@ public final class Main {
     private boolean srcprotectedPath = false;
     private boolean cacerts = false;
     private boolean nowarn = false;
-    private CertificateFactory cf = null;
     private KeyStore caks = null; // "cacerts" keystore
     private char[] srcstorePass = null;
     private String srcstoretype = null;
@@ -202,7 +207,7 @@ public final class Main {
             STORETYPE, PROVIDERNAME, ADDPROVIDER, PROVIDERCLASS,
             PROVIDERPATH, V, PROTECTED),
         GENKEYPAIR("Generates.a.key.pair",
-            ALIAS, KEYALG, KEYSIZE, SIGALG, DESTALIAS, DNAME,
+            ALIAS, KEYALG, KEYSIZE, CURVENAME, SIGALG, DESTALIAS, DNAME,
             STARTDATE, EXT, VALIDITY, KEYPASS, KEYSTORE,
             STOREPASS, STORETYPE, PROVIDERNAME, ADDPROVIDER,
             PROVIDERCLASS, PROVIDERPATH, V, PROTECTED),
@@ -240,7 +245,9 @@ public final class Main {
             PROVIDERNAME, ADDPROVIDER, PROVIDERCLASS,
             PROVIDERPATH, V, PROTECTED),
         PRINTCERT("Prints.the.content.of.a.certificate",
-            RFC, FILEIN, SSLSERVER, JARFILE, V),
+            RFC, FILEIN, SSLSERVER, JARFILE,
+            PROVIDERNAME, ADDPROVIDER, PROVIDERCLASS,
+            PROVIDERPATH, V),
         PRINTCERTREQ("Prints.the.content.of.a.certificate.request",
             FILEIN, V),
         PRINTCRL("Prints.the.content.of.a.CRL.file",
@@ -312,6 +319,7 @@ public final class Main {
     // in the optionsSet.contains() block in parseArgs().
     enum Option {
         ALIAS("alias", "<alias>", "alias.name.of.the.entry.to.process"),
+        CURVENAME("groupname", "<name>", "groupname.option.help"),
         DESTALIAS("destalias", "<alias>", "destination.alias"),
         DESTKEYPASS("destkeypass", "<arg>", "destination.key.password"),
         DESTKEYSTORE("destkeystore", "<keystore>", "destination.keystore.name"),
@@ -584,6 +592,8 @@ public final class Main {
                 dname = args[++i];
             } else if (collator.compare(flags, "-keysize") == 0) {
                 keysize = Integer.parseInt(args[++i]);
+            } else if (collator.compare(flags, "-groupname") == 0) {
+                groupName = args[++i];
             } else if (collator.compare(flags, "-keyalg") == 0) {
                 keyAlgName = args[++i];
             } else if (collator.compare(flags, "-sigalg") == 0) {
@@ -1067,12 +1077,6 @@ public final class Main {
             }
         }
 
-        // Create a certificate factory
-        if (command == PRINTCERT || command == IMPORTCERT
-                || command == IDENTITYDB || command == PRINTCRL) {
-            cf = CertificateFactory.getInstance("X509");
-        }
-
         // -trustcacerts can only be specified on -importcert.
         // Reset it so that warnings on CA cert will remain for
         // -printcert, etc.
@@ -1122,12 +1126,16 @@ public final class Main {
         } else if (command == GENKEYPAIR) {
             if (keyAlgName == null) {
                 keyAlgName = "DSA";
+                weakWarnings.add(String.format(rb.getString(
+                        "keyalg.option.1.missing.warning"), keyAlgName));
             }
-            doGenKeyPair(alias, dname, keyAlgName, keysize, sigAlgName);
+            doGenKeyPair(alias, dname, keyAlgName, keysize, groupName, sigAlgName);
             kssave = true;
         } else if (command == GENSECKEY) {
             if (keyAlgName == null) {
                 keyAlgName = "DES";
+                weakWarnings.add(String.format(rb.getString(
+                        "keyalg.option.1.missing.warning"), keyAlgName));
             }
             doGenSecretKey(alias, keyAlgName, keysize);
             kssave = true;
@@ -1323,28 +1331,39 @@ public final class Main {
             if (f.exists()) {
                 // Probe for real type. A JKS can be loaded as PKCS12 because
                 // DualFormat support, vice versa.
-                keyStore = KeyStore.getInstance(f, pass);
-                String realType = keyStore.getType();
-                if (realType.equalsIgnoreCase("JKS")
-                        || realType.equalsIgnoreCase("JCEKS")) {
-                    boolean allCerts = true;
-                    for (String a : Collections.list(keyStore.aliases())) {
-                        if (!keyStore.entryInstanceOf(
-                                a, TrustedCertificateEntry.class)) {
-                            allCerts = false;
-                            break;
+                String realType = storetype;
+                try {
+                    keyStore = KeyStore.getInstance(f, pass);
+                    realType = keyStore.getType();
+                    if (realType.equalsIgnoreCase("JKS")
+                            || realType.equalsIgnoreCase("JCEKS")) {
+                        boolean allCerts = true;
+                        for (String a : Collections.list(keyStore.aliases())) {
+                            if (!keyStore.entryInstanceOf(
+                                    a, TrustedCertificateEntry.class)) {
+                                allCerts = false;
+                                break;
+                            }
+                        }
+                        // Don't warn for "cacerts" style keystore.
+                        if (!allCerts) {
+                            weakWarnings.add(String.format(
+                                    rb.getString("jks.storetype.warning"),
+                                    realType, ksfname));
                         }
                     }
-                    // Don't warn for "cacerts" style keystore.
-                    if (!allCerts) {
-                        weakWarnings.add(String.format(
-                                rb.getString("jks.storetype.warning"),
-                                realType, ksfname));
-                    }
+                } catch (KeyStoreException e) {
+                    // Probing not supported, therefore cannot be JKS or JCEKS.
+                    // Skip the legacy type warning at all.
                 }
                 if (inplaceImport) {
-                    String realSourceStoreType = KeyStore.getInstance(
-                            new File(inplaceBackupName), srcstorePass).getType();
+                    String realSourceStoreType = srcstoretype;
+                    try {
+                        realSourceStoreType = KeyStore.getInstance(
+                                new File(inplaceBackupName), srcstorePass).getType();
+                    } catch (KeyStoreException e) {
+                        // Probing not supported. Assuming srcstoretype.
+                    }
                     String format =
                             realType.equalsIgnoreCase(realSourceStoreType) ?
                             rb.getString("backup.keystore.warning") :
@@ -1757,13 +1776,11 @@ public final class Main {
             keygen.init(keysize);
             secKey = keygen.generateKey();
 
-            if (verbose) {
-                MessageFormat form = new MessageFormat(rb.getString
-                    ("Generated.keysize.bit.keyAlgName.secret.key"));
-                Object[] source = {keysize,
-                                    secKey.getAlgorithm()};
-                System.err.println(form.format(source));
-            }
+            MessageFormat form = new MessageFormat(rb.getString
+                ("Generated.keysize.bit.keyAlgName.secret.key"));
+            Object[] source = {keysize,
+                                secKey.getAlgorithm()};
+            System.err.println(form.format(source));
         }
 
         if (keyPass == null) {
@@ -1797,16 +1814,28 @@ public final class Main {
      * Creates a new key pair and self-signed certificate.
      */
     private void doGenKeyPair(String alias, String dname, String keyAlgName,
-                              int keysize, String sigAlgName)
+                              int keysize, String groupName, String sigAlgName)
         throws Exception
     {
-        if (keysize == -1) {
-            if ("EC".equalsIgnoreCase(keyAlgName)) {
-                keysize = SecurityProviderConstants.DEF_EC_KEY_SIZE;
-            } else if ("RSA".equalsIgnoreCase(keyAlgName)) {
-                keysize = SecurityProviderConstants.DEF_RSA_KEY_SIZE;
-            } else if ("DSA".equalsIgnoreCase(keyAlgName)) {
-                keysize = SecurityProviderConstants.DEF_DSA_KEY_SIZE;
+        if (groupName != null) {
+            if (keysize != -1) {
+                throw new Exception(rb.getString("groupname.keysize.coexist"));
+            }
+        } else {
+            if (keysize == -1) {
+                if ("EC".equalsIgnoreCase(keyAlgName)) {
+                    keysize = SecurityProviderConstants.DEF_EC_KEY_SIZE;
+                } else if ("RSA".equalsIgnoreCase(keyAlgName)) {
+                    keysize = SecurityProviderConstants.DEF_RSA_KEY_SIZE;
+                } else if ("DSA".equalsIgnoreCase(keyAlgName)) {
+                    keysize = SecurityProviderConstants.DEF_DSA_KEY_SIZE;
+                }
+            } else {
+                if ("EC".equalsIgnoreCase(keyAlgName)) {
+                    weakWarnings.add(String.format(
+                            rb.getString("deprecate.keysize.for.ec"),
+                            ecGroupNameForSize(keysize)));
+                }
             }
         }
 
@@ -1828,12 +1857,19 @@ public final class Main {
         // If DN is provided, parse it. Otherwise, prompt the user for it.
         X500Name x500Name;
         if (dname == null) {
+            printWeakWarnings(true);
             x500Name = getX500Name();
         } else {
             x500Name = new X500Name(dname);
         }
 
-        keypair.generate(keysize);
+        if (groupName != null) {
+            keypair.generate(groupName);
+        } else {
+            // This covers keysize both specified and unspecified
+            keypair.generate(keysize);
+        }
+
         PrivateKey privKey = keypair.getPrivateKey();
 
         CertificateExtensions ext = createV3Extensions(
@@ -1847,22 +1883,28 @@ public final class Main {
         chain[0] = keypair.getSelfCertificate(
                 x500Name, getStartDate(startDate), validity*24L*60L*60L, ext);
 
-        if (verbose) {
-            MessageFormat form = new MessageFormat(rb.getString
-                ("Generating.keysize.bit.keyAlgName.key.pair.and.self.signed.certificate.sigAlgName.with.a.validity.of.validality.days.for"));
-            Object[] source = {keysize,
-                                privKey.getAlgorithm(),
-                                chain[0].getSigAlgName(),
-                                validity,
-                                x500Name};
-            System.err.println(form.format(source));
-        }
+        MessageFormat form = new MessageFormat(rb.getString
+            ("Generating.keysize.bit.keyAlgName.key.pair.and.self.signed.certificate.sigAlgName.with.a.validity.of.validality.days.for"));
+        Object[] source = {
+                groupName == null ? keysize : KeyUtil.getKeySize(privKey),
+                fullDisplayAlgName(privKey),
+                chain[0].getSigAlgName(),
+                validity,
+                x500Name};
+        System.err.println(form.format(source));
 
         if (keyPass == null) {
             keyPass = promptForKeyPass(alias, null, storePass);
         }
         checkWeak(rb.getString("the.generated.certificate"), chain[0]);
         keyStore.setKeyEntry(alias, privKey, keyPass, chain);
+    }
+
+    private String ecGroupNameForSize(int size) throws Exception {
+        AlgorithmParameters ap = AlgorithmParameters.getInstance("EC");
+        ap.init(new ECKeySizeParameterSpec(size));
+        // The following line assumes the toString value is "name (oid)"
+        return ap.toString().split(" ")[0];
     }
 
     /**
@@ -2189,7 +2231,7 @@ public final class Main {
                 inplaceBackupName = srcksfname + ".old" + (n == 1 ? "" : n);
                 File bkFile = new File(inplaceBackupName);
                 if (!bkFile.exists()) {
-                    Files.copy(Paths.get(srcksfname), bkFile.toPath());
+                    Files.copy(Path.of(srcksfname), bkFile.toPath());
                     break;
                 }
             }
@@ -2596,7 +2638,7 @@ public final class Main {
     {
         Collection<? extends Certificate> c = null;
         try {
-            c = cf.generateCertificates(in);
+            c = generateCertificates(in);
         } catch (CertificateException ce) {
             throw new Exception(rb.getString("Failed.to.parse.input"), ce);
         }
@@ -2625,6 +2667,44 @@ public final class Main {
                 out.println();
             }
             checkWeak(oneInMany(rb.getString("the.certificate"), i, certs.length), x509Cert);
+        }
+    }
+
+    private Collection<? extends Certificate> generateCertificates(InputStream in)
+            throws CertificateException, IOException {
+        byte[] data = in.readAllBytes();
+        try {
+            return CertificateFactory.getInstance("X.509")
+                    .generateCertificates(new ByteArrayInputStream(data));
+        } catch (CertificateException e) {
+            if (providerName != null) {
+                try {
+                    return CertificateFactory.getInstance("X.509", providerName)
+                            .generateCertificates(new ByteArrayInputStream(data));
+                } catch (Exception e2) {
+                    e.addSuppressed(e2);
+                }
+            }
+            throw e;
+        }
+    }
+
+    private Certificate generateCertificate(InputStream in)
+            throws CertificateException, IOException {
+        byte[] data = in.readAllBytes();
+        try {
+            return CertificateFactory.getInstance("X.509")
+                    .generateCertificate(new ByteArrayInputStream(data));
+        } catch (CertificateException e) {
+            if (providerName != null) {
+                try {
+                    return CertificateFactory.getInstance("X.509", providerName)
+                            .generateCertificate(new ByteArrayInputStream(data));
+                } catch (Exception e2) {
+                    e.addSuppressed(e2);
+                }
+            }
+            throw e;
         }
     }
 
@@ -2922,7 +3002,7 @@ public final class Main {
         }
 
         // Read the certificates in the reply
-        Collection<? extends Certificate> c = cf.generateCertificates(in);
+        Collection<? extends Certificate> c = generateCertificates(in);
         if (c.isEmpty()) {
             throw new Exception(rb.getString("Reply.has.no.certificates"));
         }
@@ -2969,7 +3049,7 @@ public final class Main {
         // Read the certificate
         X509Certificate cert = null;
         try {
-            cert = (X509Certificate)cf.generateCertificate(in);
+            cert = (X509Certificate)generateCertificate(in);
         } catch (ClassCastException | CertificateException ce) {
             throw new Exception(rb.getString("Input.not.an.X.509.certificate"));
         }
@@ -3190,19 +3270,28 @@ public final class Main {
         }
     }
 
-    private String withWeak(PublicKey key) {
+    private String fullDisplayAlgName(Key key) {
+        String result = key.getAlgorithm();
+        if (key instanceof ECKey) {
+            ECParameterSpec paramSpec = ((ECKey) key).getParams();
+            if (paramSpec instanceof NamedCurve) {
+                result += " (" + paramSpec.toString().split(" ")[0] + ")";
+            }
+        }
+        return result;
+    }
+
+    private String withWeak(Key key) {
+        int kLen = KeyUtil.getKeySize(key);
+        String displayAlg = fullDisplayAlgName(key);
         if (DISABLED_CHECK.permits(SIG_PRIMITIVE_SET, key)) {
-            int kLen = KeyUtil.getKeySize(key);
             if (kLen >= 0) {
-                return String.format(rb.getString("key.bit"),
-                        kLen, key.getAlgorithm());
+                return String.format(rb.getString("key.bit"), kLen, displayAlg);
             } else {
-                return String.format(
-                        rb.getString("unknown.size.1"), key.getAlgorithm());
+                return String.format(rb.getString("unknown.size.1"), displayAlg);
             }
         } else {
-            return String.format(rb.getString("key.bit.weak"),
-                    KeyUtil.getKeySize(key), key.getAlgorithm());
+            return String.format(rb.getString("key.bit.weak"), kLen, displayAlg);
         }
     }
 

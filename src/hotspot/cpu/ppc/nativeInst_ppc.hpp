@@ -27,7 +27,6 @@
 #define CPU_PPC_VM_NATIVEINST_PPC_HPP
 
 #include "asm/macroAssembler.hpp"
-#include "memory/allocation.hpp"
 #include "runtime/icache.hpp"
 #include "runtime/os.hpp"
 #include "runtime/safepointMechanism.hpp"
@@ -45,7 +44,7 @@
 
 // The base class for different kinds of native instruction abstractions.
 // It provides the primitive operations to manipulate code relative to this.
-class NativeInstruction VALUE_OBJ_CLASS_SPEC {
+class NativeInstruction {
   friend class Relocation;
 
  public:
@@ -99,12 +98,6 @@ class NativeInstruction VALUE_OBJ_CLASS_SPEC {
                                     -1, encoding);
     }
     return MacroAssembler::is_load_from_polling_page(long_at(0), NULL);
-  }
-
-  bool is_memory_serialization(JavaThread *thread, void *ucontext) {
-    // Is the current instruction a write access of thread to the
-    // memory serialization page?
-    return MacroAssembler::is_memory_serialization(long_at(0), thread, ucontext);
   }
 
   address get_stack_bang_address(void *ucontext) {

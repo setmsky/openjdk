@@ -26,7 +26,7 @@
 #include "ci/ciMetadata.hpp"
 #include "ci/ciMethodData.hpp"
 #include "ci/ciReplay.hpp"
-#include "ci/ciUtilities.hpp"
+#include "ci/ciUtilities.inline.hpp"
 #include "memory/allocation.inline.hpp"
 #include "memory/resourceArea.hpp"
 #include "runtime/deoptimization.hpp"
@@ -187,23 +187,39 @@ void ciReceiverTypeData::translate_receiver_data_from(const ProfileData* data) {
   for (uint row = 0; row < row_limit(); row++) {
     Klass* k = data->as_ReceiverTypeData()->receiver(row);
     if (k != NULL) {
-      ciKlass* klass = CURRENT_ENV->get_klass(k);
-      set_receiver(row, klass);
+      if (k->is_loader_alive()) {
+        ciKlass* klass = CURRENT_ENV->get_klass(k);
+        set_receiver(row, klass);
+      } else {
+        // With concurrent class unloading, the MDO could have stale metadata; override it
+        clear_row(row);
+      }
     }
   }
 }
 
-
 void ciTypeStackSlotEntries::translate_type_data_from(const TypeStackSlotEntries* entries) {
   for (int i = 0; i < number_of_entries(); i++) {
     intptr_t k = entries->type(i);
-    TypeStackSlotEntries::set_type(i, translate_klass(k));
+    Klass* klass = (Klass*)klass_part(k);
+    if (klass != NULL && !klass->is_loader_alive()) {
+      // With concurrent class unloading, the MDO could have stale metadata; override it
+      TypeStackSlotEntries::set_type(i, TypeStackSlotEntries::with_status((Klass*)NULL, k));
+    } else {
+      TypeStackSlotEntries::set_type(i, translate_klass(k));
+    }
   }
 }
 
 void ciReturnTypeEntry::translate_type_data_from(const ReturnTypeEntry* ret) {
   intptr_t k = ret->type();
-  set_type(translate_klass(k));
+  Klass* klass = (Klass*)klass_part(k);
+  if (klass != NULL && !klass->is_loader_alive()) {
+    // With concurrent class unloading, the MDO could have stale metadata; override it
+    set_type(ReturnTypeEntry::with_status((Klass*)NULL, k));
+  } else {
+    set_type(translate_klass(k));
+  }
 }
 
 void ciSpeculativeTrapData::translate_from(const ProfileData* data) {

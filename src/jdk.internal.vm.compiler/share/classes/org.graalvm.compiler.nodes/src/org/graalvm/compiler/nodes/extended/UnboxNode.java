@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.nodes.extended;
 
 import static org.graalvm.compiler.nodeinfo.NodeCycles.CYCLES_2;
@@ -87,7 +89,7 @@ public final class UnboxNode extends FixedWithNextNode implements Virtualizable,
         if (alias instanceof VirtualObjectNode) {
             VirtualObjectNode virtual = (VirtualObjectNode) alias;
             ResolvedJavaType objectType = virtual.type();
-            ResolvedJavaType expectedType = tool.getMetaAccessProvider().lookupJavaType(boxingKind.toBoxedJavaClass());
+            ResolvedJavaType expectedType = tool.getMetaAccess().lookupJavaType(boxingKind.toBoxedJavaClass());
             if (objectType.equals(expectedType)) {
                 tool.replaceWithValue(tool.getEntry(virtual, 0));
             }

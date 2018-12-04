@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,6 +29,7 @@ import java.lang.annotation.Native;
 import java.math.*;
 import java.util.Objects;
 import jdk.internal.HotSpotIntrinsicCandidate;
+import jdk.internal.misc.VM;
 
 import static java.lang.String.COMPACT_STRINGS;
 import static java.lang.String.LATIN1;
@@ -675,11 +676,11 @@ public final class Long extends Number implements Comparable<Long> {
                     negative = true;
                     limit = Long.MIN_VALUE;
                 } else if (firstChar != '+') {
-                    throw NumberFormatException.forInputString(s);
+                    throw NumberFormatException.forInputString(s, radix);
                 }
 
                 if (len == 1) { // Cannot have lone "+" or "-"
-                    throw NumberFormatException.forInputString(s);
+                    throw NumberFormatException.forInputString(s, radix);
                 }
                 i++;
             }
@@ -689,17 +690,17 @@ public final class Long extends Number implements Comparable<Long> {
                 // Accumulating negatively avoids surprises near MAX_VALUE
                 int digit = Character.digit(s.charAt(i++),radix);
                 if (digit < 0 || result < multmin) {
-                    throw NumberFormatException.forInputString(s);
+                    throw NumberFormatException.forInputString(s, radix);
                 }
                 result *= radix;
                 if (result < limit + digit) {
-                    throw NumberFormatException.forInputString(s);
+                    throw NumberFormatException.forInputString(s, radix);
                 }
                 result -= digit;
             }
             return negative ? result : -result;
         } else {
-            throw NumberFormatException.forInputString(s);
+            throw NumberFormatException.forInputString(s, radix);
         }
     }
 
@@ -945,7 +946,7 @@ public final class Long extends Number implements Comparable<Long> {
                 return result;
             }
         } else {
-            throw NumberFormatException.forInputString(s);
+            throw NumberFormatException.forInputString(s, radix);
         }
     }
 
@@ -1063,7 +1064,7 @@ public final class Long extends Number implements Comparable<Long> {
                 return result;
             }
         } else {
-            throw NumberFormatException.forInputString("");
+            throw NumberFormatException.forInputString("", radix);
         }
     }
 
@@ -1145,13 +1146,25 @@ public final class Long extends Number implements Comparable<Long> {
     }
 
     private static class LongCache {
-        private LongCache(){}
+        private LongCache() {}
 
-        static final Long cache[] = new Long[-(-128) + 127 + 1];
+        static final Long[] cache;
+        static Long[] archivedCache;
 
         static {
-            for(int i = 0; i < cache.length; i++)
-                cache[i] = new Long(i - 128);
+            int size = -(-128) + 127 + 1;
+
+            // Load and use the archived cache if it exists
+            VM.initializeFromArchive(LongCache.class);
+            if (archivedCache == null || archivedCache.length != size) {
+                Long[] c = new Long[size];
+                long value = -128;
+                for(int i = 0; i < size; i++) {
+                    c[i] = new Long(value++);
+                }
+                archivedCache = c;
+            }
+            cache = archivedCache;
         }
     }
 
@@ -1164,10 +1177,8 @@ public final class Long extends Number implements Comparable<Long> {
      * significantly better space and time performance by caching
      * frequently requested values.
      *
-     * Note that unlike the {@linkplain Integer#valueOf(int)
-     * corresponding method} in the {@code Integer} class, this method
-     * is <em>not</em> required to cache values within a particular
-     * range.
+     * This method will always cache values in the range -128 to 127,
+     * inclusive, and may cache other values outside of this range.
      *
      * @param  l a long value.
      * @return a {@code Long} instance representing {@code l}.
@@ -1719,14 +1730,7 @@ public final class Long extends Number implements Comparable<Long> {
      * @since 1.5
      */
     public static long highestOneBit(long i) {
-        // HD, Figure 3-1
-        i |= (i >>  1);
-        i |= (i >>  2);
-        i |= (i >>  4);
-        i |= (i >>  8);
-        i |= (i >> 16);
-        i |= (i >> 32);
-        return i - (i >>> 1);
+        return i & (MIN_VALUE >>> numberOfLeadingZeros(i));
     }
 
     /**
@@ -1770,18 +1774,9 @@ public final class Long extends Number implements Comparable<Long> {
      */
     @HotSpotIntrinsicCandidate
     public static int numberOfLeadingZeros(long i) {
-        // HD, Figure 5-6
-         if (i == 0)
-            return 64;
-        int n = 1;
         int x = (int)(i >>> 32);
-        if (x == 0) { n += 32; x = (int)i; }
-        if (x >>> 16 == 0) { n += 16; x <<= 16; }
-        if (x >>> 24 == 0) { n +=  8; x <<=  8; }
-        if (x >>> 28 == 0) { n +=  4; x <<=  4; }
-        if (x >>> 30 == 0) { n +=  2; x <<=  2; }
-        n -= x >>> 31;
-        return n;
+        return x == 0 ? 32 + Integer.numberOfLeadingZeros((int)i)
+                : Integer.numberOfLeadingZeros(x);
     }
 
     /**
@@ -1800,16 +1795,9 @@ public final class Long extends Number implements Comparable<Long> {
      */
     @HotSpotIntrinsicCandidate
     public static int numberOfTrailingZeros(long i) {
-        // HD, Figure 5-14
-        int x, y;
-        if (i == 0) return 64;
-        int n = 63;
-        y = (int)i; if (y != 0) { n = n -32; x = y; } else x = (int)(i>>>32);
-        y = x <<16; if (y != 0) { n = n -16; x = y; }
-        y = x << 8; if (y != 0) { n = n - 8; x = y; }
-        y = x << 4; if (y != 0) { n = n - 4; x = y; }
-        y = x << 2; if (y != 0) { n = n - 2; x = y; }
-        return n - ((x << 1) >>> 31);
+        int x = (int)i;
+        return x == 0 ? 32 + Integer.numberOfTrailingZeros((int)(i >>> 32))
+                : Integer.numberOfTrailingZeros(x);
     }
 
     /**

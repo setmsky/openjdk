@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.loop;
 
 import static org.graalvm.compiler.loop.MathUtil.mul;
@@ -61,13 +63,17 @@ public class DerivedScaledInductionVariable extends DerivedInductionVariable {
 
     @Override
     public Direction direction() {
+        Direction baseDirection = base.direction();
+        if (baseDirection == null) {
+            return null;
+        }
         Stamp stamp = scale.stamp(NodeView.DEFAULT);
         if (stamp instanceof IntegerStamp) {
             IntegerStamp integerStamp = (IntegerStamp) stamp;
             if (integerStamp.isStrictlyPositive()) {
-                return base.direction();
+                return baseDirection;
             } else if (integerStamp.isStrictlyNegative()) {
-                return base.direction().opposite();
+                return baseDirection.opposite();
             }
         }
         return null;

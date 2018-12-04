@@ -20,6 +20,8 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+
+
 package org.graalvm.compiler.hotspot.test;
 
 import static org.graalvm.compiler.lir.LIRInstruction.OperandFlag.REG;
@@ -146,7 +148,7 @@ public class JVMCIInfopointErrorTest extends GraalCompilerTest {
 
         CompilationResult compResult = compile(method, graph);
         CodeCacheProvider codeCache = getCodeCache();
-        HotSpotCompiledCode compiledCode = HotSpotCompiledCodeBuilder.createCompiledCode(codeCache, method, null, compResult);
+        HotSpotCompiledCode compiledCode = HotSpotCompiledCodeBuilder.createCompiledCode(codeCache, method, null, compResult, getInitialOptions());
         codeCache.addCode(method, compiledCode, null, null);
     }
 
